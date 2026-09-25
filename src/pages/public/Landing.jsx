@@ -186,7 +186,7 @@ export default function Landing() {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-white overflow-x-hidden">
+    <div className="min-h-screen bg-white overflow-x-clip">
       {/* ===================== Nav ===================== */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-navy-100/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">

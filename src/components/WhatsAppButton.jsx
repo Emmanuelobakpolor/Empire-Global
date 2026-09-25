@@ -19,6 +19,7 @@ export default function WhatsAppButton() {
             onClick={() => setDismissedHint(true)}
             className="text-navy-300 hover:text-navy-600 p-0.5"
             aria-label="Dismiss"
+            background-color="blue"
           >
             <X size={13} />
           </button>
