@@ -11,3 +11,13 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </BrowserRouter>
   </React.StrictMode>,
 )
+
+const preloader = document.getElementById('app-preloader')
+if (preloader) {
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      preloader.classList.add('preloader-hidden')
+      preloader.addEventListener('transitionend', () => preloader.remove(), { once: true })
+    }, 350)
+  })
+}

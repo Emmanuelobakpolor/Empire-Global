@@ -100,26 +100,40 @@ export default function Profile() {
         </div>
 
         <div>
-          <Card>
-            <div className="flex flex-col items-center text-center pb-5 mb-5 border-b border-navy-50">
-              <span className="w-16 h-16 rounded-full bg-navy-900 text-white flex items-center justify-center text-lg font-bold mb-3">
-                {(user?.fullName || 'U').split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()}
-              </span>
-              <p className="font-bold text-navy-900">{user?.fullName}</p>
-              <p className="text-xs text-navy-400">{user?.email}</p>
-            </div>
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-navy-400 flex items-center gap-1.5"><BadgeCheck size={14} /> Customer ID</span>
-                <span className="font-semibold text-navy-900">{user?.id}</span>
+          <Card padded={false} className="overflow-hidden">
+            <div className="relative flex flex-col items-center text-center px-6 pt-8 pb-6 bg-gradient-to-b from-navy-50/60 to-transparent">
+              <div className="relative mb-4">
+                <span className="absolute -inset-1.5 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 opacity-20 blur-md" />
+                <span className="relative w-[72px] h-[72px] rounded-full bg-gradient-to-br from-navy-800 to-navy-950 text-white flex items-center justify-center text-xl font-bold ring-4 ring-white shadow-soft">
+                  {(user?.fullName || 'U').split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()}
+                </span>
+                <span className="absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white" />
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-navy-400 flex items-center gap-1.5"><ShieldCheck size={14} /> Account Status</span>
+              <p className="font-bold text-navy-900 text-base">{user?.fullName}</p>
+              <p className="text-xs text-navy-400 mt-0.5">{user?.email}</p>
+            </div>
+
+            <div className="flex flex-col divide-y divide-navy-50 border-t border-navy-50 px-2 pb-2">
+              <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+                <span className="text-navy-400 flex items-center gap-2.5 text-xs font-medium whitespace-nowrap">
+                  <span className="w-7 h-7 rounded-lg bg-navy-50 text-navy-500 flex items-center justify-center shrink-0"><BadgeCheck size={14} /></span>
+                  Customer ID
+                </span>
+                <span className="font-semibold text-navy-900 text-sm tabular-nums">{user?.id}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+                <span className="text-navy-400 flex items-center gap-2.5 text-xs font-medium whitespace-nowrap">
+                  <span className="w-7 h-7 rounded-lg bg-navy-50 text-navy-500 flex items-center justify-center shrink-0"><ShieldCheck size={14} /></span>
+                  Account Status
+                </span>
                 <Badge status={user?.status || 'active'}>{user?.status || 'active'}</Badge>
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-navy-400 flex items-center gap-1.5"><Calendar size={14} /> Member Since</span>
-                <span className="font-semibold text-navy-900">{formatDate(user?.joined)}</span>
+              <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+                <span className="text-navy-400 flex items-center gap-2.5 text-xs font-medium whitespace-nowrap">
+                  <span className="w-7 h-7 rounded-lg bg-navy-50 text-navy-500 flex items-center justify-center shrink-0"><Calendar size={14} /></span>
+                  Member Since
+                </span>
+                <span className="font-semibold text-navy-900 text-sm text-right">{formatDate(user?.joined)}</span>
               </div>
             </div>
           </Card>
