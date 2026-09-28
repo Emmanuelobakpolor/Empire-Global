@@ -9,6 +9,22 @@ import { initialBankDetails } from '../data/bankDetails'
 const DataStoreContext = createContext(null)
 const STORAGE_KEY = 'empire_data_store_v1'
 
+// Which customer balance an approved payment of each product type credits.
+// Hire-purchase pays for goods, so it doesn't move a balance.
+const BALANCE_KEY_BY_TYPE = {
+  savings: 'savingsBalance',
+  thrift: 'savingsBalance',
+  investment: 'investmentBalance',
+  loan: 'outstandingLoan',
+}
+
+function applyApprovedAmount(customer, txn) {
+  const key = BALANCE_KEY_BY_TYPE[txn.productType]
+  if (!key) return customer
+  const next = { ...customer, [key]: (customer[key] || 0) + txn.amount }
+  return { ...next, totalBalance: (next.savingsBalance || 0) + (next.investmentBalance || 0) }
+}
+
 function loadSeed() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -88,8 +104,10 @@ export function DataStoreProvider({ children }) {
 
   const approvePayment = (transactionId) => {
     const txn = store.transactions.find((t) => t.id === transactionId)
+    if (!txn || txn.status === 'approved') return
     setStore((prev) => ({
       ...prev,
+      customers: prev.customers.map((c) => (c.id === txn.customerId ? applyApprovedAmount(c, txn) : c)),
       transactions: prev.transactions.map((t) =>
         t.id === transactionId
           ? {
@@ -199,6 +217,17 @@ export function DataStoreProvider({ children }) {
   }
 
   // ---- Customers ----
+  // Newly registered customers only exist in the auth session; add them to the
+  // store so admins can see them and approvals have a record to credit.
+  const ensureCustomer = (user) => {
+    if (!user?.id) return
+    setStore((prev) =>
+      prev.customers.some((c) => c.id === user.id)
+        ? prev
+        : { ...prev, customers: [...prev.customers, user] }
+    )
+  }
+
   const suspendCustomer = (id) => {
     const customer = store.customers.find((c) => c.id === id)
     const nextStatus = customer?.status === 'suspended' ? 'active' : 'suspended'
@@ -252,6 +281,7 @@ export function DataStoreProvider({ children }) {
     updateProduct,
     deleteProduct,
     toggleProductStatus,
+    ensureCustomer,
     suspendCustomer,
     updateBankDetails,
     markNotificationRead,

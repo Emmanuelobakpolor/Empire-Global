@@ -7,6 +7,7 @@ import TransactionTable from '../../components/customer/TransactionTable'
 import EmptyState from '../../components/ui/EmptyState'
 import { useAuth } from '../../context/AuthContext'
 import { useDataStore } from '../../context/DataStoreContext'
+import { useCustomerAccount } from '../../hooks/useCustomerAccount'
 import { formatCurrency } from '../../utils/formatCurrency'
 
 export default function ProductCategoryPage({ type, title, subtitle, icon: Icon, balanceKey }) {
@@ -15,7 +16,8 @@ export default function ProductCategoryPage({ type, title, subtitle, icon: Icon,
 
   const categoryProducts = products.filter((p) => p.type === type && p.status === 'active')
   const categoryTransactions = transactions.filter((t) => t.customerId === user?.id && t.productType === type && t.status !== 'draft')
-  const balance = balanceKey ? user?.[balanceKey] || 0 : null
+  const account = useCustomerAccount()
+  const balance = balanceKey ? account?.[balanceKey] || 0 : null
 
   return (
     <div>

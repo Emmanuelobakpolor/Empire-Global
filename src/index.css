@@ -249,3 +249,80 @@ tbody.stagger-rows > tr:nth-child(n+6) { animation-delay: 150ms; }
 .text-shadow-photo {
   text-shadow: 0 1px 12px rgba(7, 15, 30, 0.75), 0 1px 3px rgba(7, 15, 30, 0.55);
 }
+
+/* ============================================================
+   Customer dashboard
+   ============================================================ */
+
+/* Slowly shifting gradient for the welcome banner */
+@keyframes gradient-pan {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.animate-gradient-pan {
+  background-size: 200% 200%;
+  animation: gradient-pan 14s ease-in-out infinite;
+}
+
+/* Waving hand next to the greeting: waves twice on load, then rests */
+@keyframes wave {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  10%, 30% { transform: rotate(14deg); }
+  20% { transform: rotate(-8deg); }
+  40% { transform: rotate(-4deg); }
+  50% { transform: rotate(10deg); }
+}
+.animate-wave {
+  display: inline-block;
+  transform-origin: 70% 70%;
+  animation: wave 1.8s ease-in-out 0.4s 2;
+}
+
+/* Light sheen that sweeps across a card on hover: add .sheen to a relative, overflow-hidden parent */
+.sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+.sheen:hover::after {
+  transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  transform: translateX(120%);
+}
+
+/* Scale-in for tiles, a touch springier than rise-in */
+@keyframes pop-in {
+  0% { opacity: 0; transform: translateY(8px) scale(0.94); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.stagger-pop > * {
+  animation: pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.stagger-pop > *:nth-child(1) { animation-delay: 150ms; }
+.stagger-pop > *:nth-child(2) { animation-delay: 200ms; }
+.stagger-pop > *:nth-child(3) { animation-delay: 250ms; }
+.stagger-pop > *:nth-child(4) { animation-delay: 300ms; }
+.stagger-pop > *:nth-child(5) { animation-delay: 350ms; }
+.stagger-pop > *:nth-child(n+6) { animation-delay: 400ms; }
+
+/* Small bounce for icons on hover: put .icon-bounce on the icon inside a .group */
+@keyframes icon-bounce {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-4px) rotate(-6deg); }
+  70% { transform: translateY(1px); }
+}
+.group:hover .icon-bounce {
+  animation: icon-bounce 0.6s ease-in-out;
+}
+
+/* Progress bar that fills on mount */
+@keyframes bar-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.animate-bar-fill {
+  transform-origin: left;
+  animation: bar-fill 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
+}

@@ -10,12 +10,12 @@ export default function StatCard({ label, value, icon: Icon, delta, deltaLabel =
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-navy-100 shadow-card p-5 flex flex-col gap-3 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+    <div className="group sheen relative overflow-hidden bg-white rounded-2xl border border-navy-100 shadow-card p-5 flex flex-col gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-navy-200">
       <div className="flex items-center justify-between">
         <span className="text-sm text-navy-400 font-medium">{label}</span>
         {Icon && (
-          <span className={`w-9 h-9 rounded-xl flex items-center justify-center ${toneStyles[tone]}`}>
-            <Icon size={18} />
+          <span className={`w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 ${toneStyles[tone]}`}>
+            <Icon size={18} className="icon-bounce" />
           </span>
         )}
       </div>
