@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { initialCustomers } from '../data/customers'
-import { initialProducts } from '../data/products'
+import { initialProducts, CATALOG_VERSION } from '../data/products'
 import { initialTransactions } from '../data/transactions'
 import { initialNotifications } from '../data/notifications'
 import { initialAuditLogs } from '../data/auditLogs'
@@ -36,13 +36,20 @@ function loadSeed() {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       // Fill in collections added after this browser's data was saved
-      const saved = { ...defaultStore(), ...JSON.parse(raw) }
+      const parsed = JSON.parse(raw)
+      const saved = { ...defaultStore(), ...parsed }
       // Products saved before the official catalogue (no `category`) are replaced by it
       if (!saved.products.some((p) => p.category)) saved.products = initialProducts
-      // Plan lengths were added later; copy them onto saved products that lack them
-      saved.products = saved.products.map((p) =>
-        'termOptions' in p ? p : { ...p, termOptions: initialProducts.find((s) => s.id === p.id)?.termOptions ?? null }
-      )
+      // Refresh plan options (duration, lengths, frequency) on catalogue products when the
+      // catalogue changes; other admin edits and admin-added products are kept
+      if (parsed.catalogVersion !== CATALOG_VERSION) {
+        saved.products = saved.products.map((p) => {
+          const seed = initialProducts.find((s) => s.id === p.id)
+          if (seed) return { ...p, duration: seed.duration, termOptions: seed.termOptions, frequency: seed.frequency }
+          return 'termOptions' in p ? p : { ...p, termOptions: null }
+        })
+        saved.catalogVersion = CATALOG_VERSION
+      }
       return saved
     }
   } catch {
@@ -62,6 +69,7 @@ function defaultStore() {
     accountAssignments: initialAccountAssignments,
     admins: initialAdmins,
     agents: initialAgents,
+    catalogVersion: CATALOG_VERSION,
   }
 }
 
