@@ -1,4 +1,9 @@
 // Transaction statuses: pending | processing | approved | rejected
+//
+// slipTrail records every admin touch on a payment slip, oldest first:
+//   { action: 'viewed' | 'recommended_approval' | 'recommended_rejection' | 'approved' | 'rejected',
+//     by, role, at, note? }
+// Admins can view and recommend; only a Super Admin's 'approved' credits the customer.
 export const initialTransactions = [
   {
     id: 't1',
@@ -6,7 +11,7 @@ export const initialTransactions = [
     customerId: 'EMP-84920',
     customerName: 'Adewale Alao',
     productId: 'p3',
-    productName: 'Fixed Investment 12-Month',
+    productName: 'One-Year Lump-Sum Investment',
     productType: 'investment',
     amount: 150000,
     date: '2026-08-18',
@@ -19,6 +24,10 @@ export const initialTransactions = [
       { label: 'Awaiting Verification', done: false, current: true },
       { label: 'Payment Approved', done: false },
     ],
+    slipTrail: [
+      { action: 'viewed', by: 'Michael Bassey', role: 'Admin', at: '2026-08-18T10:02:00' },
+      { action: 'recommended_approval', by: 'Michael Bassey', role: 'Admin', at: '2026-08-18T10:06:00', note: 'Amount and bank match the receipt.' },
+    ],
   },
   {
     id: 't2',
@@ -26,7 +35,7 @@ export const initialTransactions = [
     customerId: 'EMP-84920',
     customerName: 'Adewale Alao',
     productId: 'p9',
-    productName: 'Hire-Purchase Electronics',
+    productName: 'Hire-Purchase: Electronics',
     productType: 'hire-purchase',
     amount: 45000,
     date: '2026-08-15',
@@ -39,6 +48,12 @@ export const initialTransactions = [
       { label: 'Awaiting Verification', done: true, date: '2026-08-16T10:00:00' },
       { label: 'Payment Approved', done: true, date: '2026-08-16T10:05:00' },
     ],
+    slipTrail: [
+      { action: 'viewed', by: 'Michael Bassey', role: 'Admin', at: '2026-08-16T09:40:00' },
+      { action: 'recommended_approval', by: 'Michael Bassey', role: 'Admin', at: '2026-08-16T09:44:00' },
+      { action: 'viewed', by: 'Sarah Johnson', role: 'Super Admin', at: '2026-08-16T10:03:00' },
+      { action: 'approved', by: 'Sarah Johnson', role: 'Super Admin', at: '2026-08-16T10:05:00' },
+    ],
   },
   {
     id: 't3',
@@ -46,7 +61,7 @@ export const initialTransactions = [
     customerId: 'EMP-84920',
     customerName: 'Adewale Alao',
     productId: 'p2',
-    productName: 'Target Save',
+    productName: 'Monthly Savings Investment Plan (MSP)',
     productType: 'savings',
     amount: 20000,
     date: '2026-08-10',
@@ -66,7 +81,7 @@ export const initialTransactions = [
     customerId: 'EMP-84920',
     customerName: 'Adewale Alao',
     productId: 'p7',
-    productName: 'Personal Quick Loan',
+    productName: 'Salary Advance',
     productType: 'loan',
     amount: 15000,
     date: '2026-08-05',
@@ -86,7 +101,7 @@ export const initialTransactions = [
     customerId: 'EMP-84920',
     customerName: 'Adewale Alao',
     productId: 'p5',
-    productName: 'Thrift Gold Plan',
+    productName: 'Monthly Collection (MC)',
     productType: 'thrift',
     amount: 46000,
     date: '2026-08-01',
@@ -100,6 +115,11 @@ export const initialTransactions = [
       { label: 'Awaiting Verification', done: true, date: '2026-08-02T09:00:00' },
       { label: 'Payment Rejected', done: true, rejected: true, date: '2026-08-02T09:10:00' },
     ],
+    slipTrail: [
+      { action: 'viewed', by: 'Michael Bassey', role: 'Admin', at: '2026-08-02T08:50:00' },
+      { action: 'recommended_rejection', by: 'Michael Bassey', role: 'Admin', at: '2026-08-02T08:55:00', note: 'Receipt image is blurry.' },
+      { action: 'rejected', by: 'Sarah Johnson', role: 'Super Admin', at: '2026-08-02T09:10:00', note: 'Receipt image was unclear — amount could not be verified.' },
+    ],
   },
   {
     id: 't6',
@@ -107,7 +127,7 @@ export const initialTransactions = [
     customerId: 'EMP-71230',
     customerName: 'John Doe',
     productId: 'p4',
-    productName: 'Growth Fund 6-Month',
+    productName: 'Two or More Years Lump-Sum Investment',
     productType: 'investment',
     amount: 250000,
     date: '2026-07-22',
@@ -127,7 +147,7 @@ export const initialTransactions = [
     customerId: 'EMP-63321',
     customerName: 'Chioma Nwosu',
     productId: 'p1',
-    productName: 'Flexi Save',
+    productName: 'Weekly Savings Investment Plan (WSP)',
     productType: 'savings',
     amount: 30000,
     date: '2026-07-18',
@@ -147,12 +167,12 @@ export const initialTransactions = [
     customerId: 'EMP-49873',
     customerName: 'Grace Effiong',
     productId: 'p10',
-    productName: 'Hire-Purchase Vehicles',
+    productName: 'Hire-Purchase: Tricycles & Bikes',
     productType: 'hire-purchase',
     amount: 750000,
     date: '2026-07-12',
     status: 'approved',
-    receipt: { fileName: 'vehicle-hp.png', uploadedAt: '2026-07-12T09:20:00' },
+    receipt: { fileName: 'tricycle-hp.png', uploadedAt: '2026-07-12T09:20:00' },
     timeline: [
       { label: 'Transaction Created', done: true, date: '2026-07-12T09:00:00' },
       { label: 'Payment Instructions Generated', done: true, date: '2026-07-12T09:01:00' },

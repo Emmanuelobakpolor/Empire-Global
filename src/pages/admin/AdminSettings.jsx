@@ -21,7 +21,7 @@ export default function AdminSettings() {
   const [active, setActive] = useState('general')
   const [saving, setSaving] = useState(false)
 
-  const [general, setGeneral] = useState({ platformName: 'Empire Global', supportEmail: 'support@empireglobal.com', timezone: 'Africa/Lagos' })
+  const [general, setGeneral] = useState({ platformName: 'Empire Global', supportEmail: 'Info@empireglobalbenefits.com', timezone: 'Africa/Lagos' })
   const [profile, setProfile] = useState({ fullName: admin?.fullName || '', email: admin?.email || '' })
   const [security, setSecurity] = useState({ current: '', next: '', confirm: '' })
   const [notifications, setNotifications] = useState({ paymentAlerts: true, newCustomer: true, weeklyDigest: false })

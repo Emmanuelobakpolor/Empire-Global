@@ -4,6 +4,7 @@ import { Mail, Lock, Info } from 'lucide-react'
 import AuthLayout from '../../components/AuthLayout'
 import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
+import GoogleAuthButton, { AuthDivider } from '../../components/GoogleAuthButton'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 
@@ -12,7 +13,8 @@ export default function Login() {
   const [password, setPassword] = useState('password123')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { login } = useAuth()
+  const [googleLoading, setGoogleLoading] = useState(false)
+  const { login, continueWithGoogle } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
 
@@ -34,6 +36,19 @@ export default function Login() {
     }
   }
 
+  const handleGoogle = async () => {
+    setGoogleLoading(true)
+    const result = await continueWithGoogle({ intent: 'login' })
+    setGoogleLoading(false)
+    if (!result.success) return
+    if (result.isNewUser) {
+      navigate('/complete-profile', { state: { googleProfile: result.googleProfile } })
+    } else {
+      showToast('Welcome back! You have logged in with Google.', 'success')
+      navigate('/customer/dashboard')
+    }
+  }
+
   return (
     <AuthLayout
       title="Welcome Back"
@@ -51,6 +66,9 @@ export default function Login() {
         <Info size={15} className="mt-0.5 shrink-0" />
         <p>Demo login: <strong>customer@example.com</strong> / <strong>password123</strong></p>
       </div>
+
+      <GoogleAuthButton onClick={handleGoogle} loading={googleLoading} />
+      <AuthDivider>or login with email</AuthDivider>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <Input

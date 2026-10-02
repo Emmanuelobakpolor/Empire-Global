@@ -3,9 +3,9 @@ import PageHeader from '../../components/ui/PageHeader'
 import Card from '../../components/ui/Card'
 
 const CHANNELS = [
-  { icon: Mail, label: 'Email Support', value: 'support@empireglobal.com' },
-  { icon: Phone, label: 'Call Us', value: '+234 700 000 0000' },
-  { icon: MessageCircle, label: 'Live Chat', value: 'Available 8am - 6pm, Mon - Sat' },
+  { icon: Mail, label: 'Email Support', value: 'Info@empireglobalbenefits.com' },
+  { icon: Phone, label: 'Call Us', value: '+234 9068410302' },
+  { icon: MessageCircle, label: 'Support Hours', value: 'Monday – Friday, 8:00 AM – 5:00 PM (WAT)' },
 ]
 
 export default function Support() {

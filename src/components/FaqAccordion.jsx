@@ -29,7 +29,9 @@ export default function FaqAccordion({ items }) {
               style={{ gridTemplateRows: isOpen ? '1fr' : '0fr' }}
             >
               <div className="overflow-hidden">
-                <p className="px-5 pb-4 text-sm text-navy-500 leading-relaxed">{item.answer}</p>
+                <div className="px-5 pb-4 text-sm text-navy-500 leading-relaxed space-y-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_strong]:text-navy-700">
+                  {item.answer}
+                </div>
               </div>
             </div>
           </div>

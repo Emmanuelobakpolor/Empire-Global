@@ -11,22 +11,30 @@ import {
   Settings,
   X,
   ShieldCheck,
+  UserCog,
+  BadgeCheck,
 } from 'lucide-react'
 import Logo from '../Logo'
+import { useAdminAuth } from '../../context/AdminAuthContext'
 
 const NAV_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/admin/customers', label: 'Customers', icon: Users },
+  { to: '/admin/agents', label: 'Agents', icon: BadgeCheck },
   { to: '/admin/payments', label: 'Payments', icon: Wallet },
   { to: '/admin/transactions', label: 'Transactions', icon: Receipt },
   { to: '/admin/products', label: 'Products', icon: Package },
   { to: '/admin/reports', label: 'Reports', icon: BarChart3 },
-  { to: '/admin/bank-details', label: 'Bank Details', icon: Landmark },
+  { to: '/admin/bank-details', label: 'Bank Accounts', icon: Landmark },
   { to: '/admin/audit-logs', label: 'Audit Logs', icon: ScrollText },
+  { to: '/admin/admins', label: 'Admin Management', icon: UserCog, superAdminOnly: true },
   { to: '/admin/settings', label: 'Settings', icon: Settings },
 ]
 
 export default function AdminSidebar({ open, onClose }) {
+  const { isSuperAdmin } = useAdminAuth()
+  const navItems = NAV_ITEMS.filter((item) => !item.superAdminOnly || isSuperAdmin)
+
   return (
     <>
       {open && <div className="fixed inset-0 bg-navy-950/50 z-40 lg:hidden" onClick={onClose} />}
@@ -44,11 +52,11 @@ export default function AdminSidebar({ open, onClose }) {
 
         <div className="mx-4 mb-3 px-3 py-2 rounded-xl bg-navy-800 flex items-center gap-2 text-navy-300 text-xs font-semibold">
           <ShieldCheck size={14} className="text-emerald-400" />
-          ADMIN PORTAL
+          {isSuperAdmin ? 'SUPER ADMIN PORTAL' : 'ADMIN PORTAL'}
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-1 scrollbar-none">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

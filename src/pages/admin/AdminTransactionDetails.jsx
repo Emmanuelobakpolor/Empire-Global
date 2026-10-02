@@ -5,6 +5,8 @@ import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import EmptyState from '../../components/ui/EmptyState'
 import TransactionTimeline from '../../components/customer/TransactionTimeline'
+import ApplicationDetails from '../../components/admin/ApplicationDetails'
+import PlanPeriodCard from '../../components/PlanPeriod'
 import { useDataStore } from '../../context/DataStoreContext'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatDate } from '../../utils/formatDate'
@@ -63,6 +65,10 @@ export default function AdminTransactionDetails() {
           </Link>
         )}
       </Card>
+
+      <PlanPeriodCard transaction={transaction} />
+
+      <ApplicationDetails transaction={transaction} />
 
       <Card>
         <h3 className="text-sm font-bold text-navy-800 mb-5">Transaction Timeline</h3>

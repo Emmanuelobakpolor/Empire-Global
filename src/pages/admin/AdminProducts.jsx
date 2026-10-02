@@ -58,7 +58,10 @@ export default function AdminProducts() {
       <Table columns={['Product', 'Type', 'Minimum Amount', 'Maximum Amount', 'Status', 'Actions']}>
         {products.map((p) => (
           <Tr key={p.id}>
-            <Td className="font-semibold text-navy-900">{p.name}</Td>
+            <Td>
+              <p className="font-semibold text-navy-900">{p.name}</p>
+              {p.category && <p className="text-[11px] text-navy-400">{p.category}</p>}
+            </Td>
             <Td className="capitalize">{typeLabel(p.type)}</Td>
             <Td>{formatCurrency(p.minAmount)}</Td>
             <Td>{formatCurrency(p.maxAmount)}</Td>

@@ -8,12 +8,13 @@ import EmptyState from '../../components/ui/EmptyState'
 import { useDataStore } from '../../context/DataStoreContext'
 import { useToast } from '../../context/ToastContext'
 import { formatCurrency } from '../../utils/formatCurrency'
+import { resolveBankAccount } from '../../data/bankAccounts'
 
 export default function PaymentInstructions() {
   const [searchParams] = useSearchParams()
   const ref = searchParams.get('ref')
   const navigate = useNavigate()
-  const { transactions, bankDetails } = useDataStore()
+  const { transactions, bankAccounts, accountAssignments } = useDataStore()
   const { showToast } = useToast()
   const [copied, setCopied] = useState('')
 
@@ -36,12 +37,25 @@ export default function PaymentInstructions() {
     )
   }
 
+  // Each facility can have its own collection account, set by admins
+  const account = resolveBankAccount(bankAccounts, accountAssignments, transaction.productType)
+
+  if (!account) {
+    return (
+      <EmptyState
+        title="Payment details unavailable"
+        description="No bank account is set up for this product yet. Please contact support before making a payment."
+        action={<Link to="/customer/support"><Button>Contact Support</Button></Link>}
+      />
+    )
+  }
+
   const rows = [
     { key: 'reference', label: 'Transaction Reference', value: transaction.reference, mono: true },
     { key: 'amount', label: 'Amount', value: formatCurrency(transaction.amount) },
-    { key: 'bank', label: 'Bank', value: bankDetails.bankName },
-    { key: 'accountNumber', label: 'Account Number', value: bankDetails.accountNumber, mono: true },
-    { key: 'accountName', label: 'Account Name', value: bankDetails.accountName },
+    { key: 'bank', label: 'Bank', value: account.bankName },
+    { key: 'accountNumber', label: 'Account Number', value: account.accountNumber, mono: true },
+    { key: 'accountName', label: 'Account Name', value: account.accountName },
   ]
 
   return (
@@ -77,6 +91,7 @@ export default function PaymentInstructions() {
             </div>
           ))}
         </div>
+        {account.notes && <p className="text-xs text-navy-500 mt-3"><strong>Note:</strong> {account.notes}</p>}
       </Card>
 
       <Card className="mb-6 !bg-amber-50 !border-amber-100">

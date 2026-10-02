@@ -34,6 +34,7 @@ export default function ProductCard({ product }) {
           </span>
         )}
       </div>
+      {product.category && <p className="text-[11px] font-semibold uppercase tracking-wider text-navy-400 mb-1">{product.category}</p>}
       <h3 className="text-base font-bold text-navy-900">{product.name}</h3>
       <p className="text-sm text-navy-400 mt-1.5 line-clamp-2 flex-1">{product.description}</p>
 

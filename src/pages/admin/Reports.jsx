@@ -12,6 +12,7 @@ import { useDataStore } from '../../context/DataStoreContext'
 import { useToast } from '../../context/ToastContext'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { productTypes } from '../../data/products'
+import AgentFilter, { useAgentFilter } from '../../components/admin/AgentFilter'
 import { Receipt, CheckCircle2, Clock, XCircle } from 'lucide-react'
 
 const STATUS_OPTIONS = [
@@ -27,9 +28,11 @@ export default function Reports() {
   const [statusFilter, setStatusFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const agentFilter = useAgentFilter()
 
   const filtered = transactions.filter((t) => {
     if (t.status === 'draft') return false
+    if (!agentFilter.matchesCustomer(t.customerId)) return false
     if (productFilter && t.productType !== productFilter) return false
     if (statusFilter && t.status !== statusFilter) return false
     if (dateFrom && t.date < dateFrom) return false
@@ -68,6 +71,7 @@ export default function Reports() {
           <Input label="To" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           <Select label="Product" placeholder="All Products" value={productFilter} onChange={(e) => setProductFilter(e.target.value)} options={productTypes} />
           <Select label="Status" placeholder="All Statuses" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} options={STATUS_OPTIONS} />
+          <AgentFilter filter={agentFilter} withLabels />
         </div>
       </Card>
 

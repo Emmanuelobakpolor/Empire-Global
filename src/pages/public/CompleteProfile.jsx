@@ -1,37 +1,40 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Mail, Lock, User, Phone, BadgeCheck } from 'lucide-react'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Mail, User, Phone, BadgeCheck, CheckCircle2 } from 'lucide-react'
 import AuthLayout from '../../components/AuthLayout'
 import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
-import GoogleAuthButton, { AuthDivider } from '../../components/GoogleAuthButton'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import { useDataStore } from '../../context/DataStoreContext'
 import { validateAgentCode } from '../../utils/validateAgentCode'
 
-export default function Register() {
-  const [form, setForm] = useState({ fullName: '', email: '', phone: '', agentCode: '', password: '', confirmPassword: '' })
+export default function CompleteProfile() {
+  const { state } = useLocation()
+  const googleProfile = state?.googleProfile
+  const [form, setForm] = useState({
+    fullName: googleProfile?.fullName || '',
+    phone: '',
+    agentCode: '',
+  })
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
-  const [googleLoading, setGoogleLoading] = useState(false)
-  const { register, continueWithGoogle } = useAuth()
+  const { register } = useAuth()
   const { agents } = useDataStore()
   const { showToast } = useToast()
   const navigate = useNavigate()
+
+  // Only reachable straight after a first-time Google sign-in
+  if (!googleProfile) return <Navigate to="/register" replace />
 
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
   const validate = () => {
     const errs = {}
     if (!form.fullName.trim()) errs.fullName = 'Full name is required.'
-    if (!form.email.trim()) errs.email = 'Email is required.'
     if (!form.phone.trim()) errs.phone = 'Phone number is required.'
     const agentError = validateAgentCode(agents, form.agentCode)
     if (agentError) errs.agentCode = agentError
-    if (!form.password) errs.password = 'Password is required.'
-    else if (form.password.length < 6) errs.password = 'Password must be at least 6 characters.'
-    if (form.confirmPassword !== form.password) errs.confirmPassword = 'Passwords do not match.'
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -40,7 +43,7 @@ export default function Register() {
     e.preventDefault()
     if (!validate()) return
     setLoading(true)
-    const result = await register(form)
+    const result = await register({ ...form, email: googleProfile.email, authProvider: 'google' })
     setLoading(false)
     if (result.success) {
       showToast('Account created successfully! Welcome to Empire Global.', 'success')
@@ -48,34 +51,23 @@ export default function Register() {
     }
   }
 
-  const handleGoogle = async () => {
-    setGoogleLoading(true)
-    const result = await continueWithGoogle({ intent: 'register' })
-    setGoogleLoading(false)
-    if (!result.success) return
-    if (result.isNewUser) {
-      navigate('/complete-profile', { state: { googleProfile: result.googleProfile } })
-    } else {
-      showToast('Welcome back! You have logged in with Google.', 'success')
-      navigate('/customer/dashboard')
-    }
-  }
-
   return (
     <AuthLayout
-      title="Create Your Account"
-      subtitle="Join Empire Global and start building your financial future."
+      title="Complete Your Profile"
+      subtitle="Just a few more details to finish setting up your account."
       footer={
         <>
-          Already have an account?{' '}
-          <Link to="/login" className="font-semibold text-emerald-600 hover:text-emerald-700">
-            Login
+          Not you?{' '}
+          <Link to="/register" className="font-semibold text-emerald-600 hover:text-emerald-700">
+            Use a different account
           </Link>
         </>
       }
     >
-      <GoogleAuthButton onClick={handleGoogle} loading={googleLoading} />
-      <AuthDivider>or sign up with email</AuthDivider>
+      <div className="flex items-start gap-2 bg-emerald-50 text-emerald-700 text-xs rounded-xl px-3.5 py-2.5 mb-6">
+        <CheckCircle2 size={15} className="mt-0.5 shrink-0" />
+        <p>Signed in with Google as <strong>{googleProfile.email}</strong></p>
+      </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <Input
@@ -91,11 +83,10 @@ export default function Register() {
           label="Email Address"
           type="email"
           icon={Mail}
-          placeholder="you@example.com"
-          value={form.email}
-          onChange={update('email')}
-          error={errors.email}
-          required
+          value={googleProfile.email}
+          readOnly
+          disabled
+          hint="Linked to your Google account."
         />
         <Input
           label="Phone Number"
@@ -115,28 +106,8 @@ export default function Register() {
           error={errors.agentCode}
           hint="Optional. Enter the code of the agent who referred you."
         />
-        <Input
-          label="Password"
-          type="password"
-          icon={Lock}
-          placeholder="Create a password"
-          value={form.password}
-          onChange={update('password')}
-          error={errors.password}
-          required
-        />
-        <Input
-          label="Confirm Password"
-          type="password"
-          icon={Lock}
-          placeholder="Re-enter your password"
-          value={form.confirmPassword}
-          onChange={update('confirmPassword')}
-          error={errors.confirmPassword}
-          required
-        />
         <Button type="submit" fullWidth loading={loading} size="lg" className="mt-1">
-          Create Account
+          Finish Setup
         </Button>
         <p className="text-xs text-navy-400 text-center">
           By continuing you agree to Empire Global's Terms & Conditions and Privacy Policy.

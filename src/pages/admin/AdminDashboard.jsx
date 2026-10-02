@@ -1,5 +1,8 @@
 import { Link } from 'react-router-dom'
-import { Users, Clock, CheckCircle2, Receipt, ArrowRight } from 'lucide-react'
+import { Users, Clock, CheckCircle2, Receipt, ArrowRight, ShieldCheck } from 'lucide-react'
+import AgentFilter, { useAgentFilter } from '../../components/admin/AgentFilter'
+import { useAdminAuth } from '../../context/AdminAuthContext'
+import { slipStage } from '../../utils/slipReview'
 import PageHeader from '../../components/ui/PageHeader'
 import StatCard from '../../components/ui/StatCard'
 import Card from '../../components/ui/Card'
@@ -12,7 +15,14 @@ import { formatCurrency } from '../../utils/formatCurrency'
 import { formatDate, timeAgo } from '../../utils/formatDate'
 
 export default function AdminDashboard() {
-  const { customers, transactions, auditLogs } = useDataStore()
+  const store = useDataStore()
+  const { isSuperAdmin } = useAdminAuth()
+  const agentFilter = useAgentFilter()
+
+  const customers = store.customers.filter((c) => agentFilter.matches(c.agentCode))
+  const transactions = store.transactions.filter((t) => agentFilter.matchesCustomer(t.customerId))
+  const auditLogs = store.auditLogs.filter((l) => agentFilter.matches(l.agentCode))
+  const awaitingFinal = transactions.filter((t) => slipStage(t).label.includes('awaiting Super Admin'))
 
   const pendingPayments = transactions.filter((t) => t.status === 'pending' || t.status === 'processing')
   const approvedTotal = transactions.filter((t) => t.status === 'approved').reduce((sum, t) => sum + t.amount, 0)
@@ -22,6 +32,23 @@ export default function AdminDashboard() {
   return (
     <div>
       <PageHeader title="Admin Dashboard" subtitle="Overview of Empire Global platform activity." />
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        <AgentFilter filter={agentFilter} />
+      </div>
+
+      {isSuperAdmin && awaitingFinal.length > 0 && (
+        <Link
+          to="/admin/payments"
+          className="flex items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-5 py-4 mb-6 text-sm text-blue-800 hover:bg-blue-100/70"
+        >
+          <span className="flex items-center gap-2">
+            <ShieldCheck size={17} />
+            <strong>{awaitingFinal.length}</strong> payment slip{awaitingFinal.length === 1 ? '' : 's'} recommended by admins {awaitingFinal.length === 1 ? 'is' : 'are'} awaiting your final approval.
+          </span>
+          <ArrowRight size={16} className="shrink-0" />
+        </Link>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 stagger-children">
         <StatCard label="Total Customers" value={customers.length.toLocaleString()} icon={Users} delta={6.3} tone="navy" />

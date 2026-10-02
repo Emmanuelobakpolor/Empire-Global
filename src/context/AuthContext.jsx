@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { demoCustomer } from '../data/customers'
 import { generateCustomerId } from '../utils/generateReference'
+import { normalizeAgentCode } from '../data/agents'
 
 const AuthContext = createContext(null)
 const STORAGE_KEY = 'empire_customer_session'
@@ -49,6 +50,8 @@ export function AuthProvider({ children }) {
       fullName: data.fullName,
       email: data.email,
       phone: data.phone,
+      agentCode: normalizeAgentCode(data.agentCode) || null,
+      authProvider: data.authProvider || 'password',
       status: 'active',
       joined: new Date().toISOString().slice(0, 10),
       savingsBalance: 0,
@@ -60,6 +63,22 @@ export function AuthProvider({ children }) {
     return { success: true }
   }
 
+  // Mock Google OAuth. No real integration yet: the backend will handle the redirect,
+  // ID-token validation and account linking. Here we simulate the two outcomes:
+  // a returning Google user is signed straight in, a new one must complete their profile.
+  const continueWithGoogle = async ({ intent }) => {
+    await new Promise((r) => setTimeout(r, 700))
+    if (intent === 'login') {
+      persist({ ...demoCustomer, authProvider: 'google' })
+      return { success: true, isNewUser: false }
+    }
+    return {
+      success: true,
+      isNewUser: true,
+      googleProfile: { fullName: 'Adewale Alao', email: 'adewale.alao@gmail.com' },
+    }
+  }
+
   const logout = () => persist(null)
 
   const updateProfile = (updates) => {
@@ -67,7 +86,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAuthenticated: !!user, login, register, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, loading, isAuthenticated: !!user, login, register, continueWithGoogle, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   )

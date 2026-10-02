@@ -9,7 +9,9 @@ import TransactionTable from '../../components/customer/TransactionTable'
 import { useDataStore } from '../../context/DataStoreContext'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatDate } from '../../utils/formatDate'
-import { PiggyBank, TrendingUp, Landmark, Wallet } from 'lucide-react'
+import { PiggyBank, TrendingUp, Landmark, BadgeCheck, Users } from 'lucide-react'
+import { DetailList, nextOfKinRows } from '../../components/customer/ApplicationForms'
+import { AgentCell } from '../../components/admin/AgentFilter'
 
 export default function CustomerDetails() {
   const { id } = useParams()
@@ -52,6 +54,21 @@ export default function CustomerDetails() {
           <div className="flex items-center gap-2 text-navy-600"><Mail size={15} className="text-navy-300" /> {customer.email}</div>
           <div className="flex items-center gap-2 text-navy-600"><Phone size={15} className="text-navy-300" /> {customer.phone}</div>
           <div className="flex items-center gap-2 text-navy-600"><Calendar size={15} className="text-navy-300" /> Joined {formatDate(customer.joined)}</div>
+        </div>
+        <div className="mt-4 pt-4 border-t border-navy-50 flex items-start gap-2 text-sm">
+          <BadgeCheck size={15} className="text-navy-300 mt-0.5" />
+          <div>
+            <p className="text-xs text-navy-400 mb-0.5">Agent</p>
+            <AgentCell code={customer.agentCode} />
+          </div>
+        </div>
+        <div className="mt-4 pt-4 border-t border-navy-50">
+          <p className="text-xs text-navy-400 mb-2 flex items-center gap-1.5"><Users size={13} /> Next of Kin</p>
+          {customer.nextOfKin ? (
+            <DetailList rows={nextOfKinRows(customer.nextOfKin)} />
+          ) : (
+            <p className="text-sm text-navy-400">Not provided yet.</p>
+          )}
         </div>
       </Card>
 

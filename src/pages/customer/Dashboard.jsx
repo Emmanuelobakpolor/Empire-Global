@@ -19,9 +19,9 @@ const QUICK_ACTIONS = [
 ]
 
 const FEATURED_PRODUCTS = [
-  { name: 'Thrift Gold Plan', tag: 'Thrift', desc: 'Daily or weekly automated contributions. Enjoy up to 8.5% annual yield.' },
-  { name: 'Fixed Investment 12-Month', tag: 'Investment', desc: 'Lock funds for a year and reap high-yield stable interest up to 14.2% per annum.' },
-  { name: 'Hire-Purchase Electronics', tag: 'Hire-Purchase', desc: 'Acquire premium corporate electronics and pay flexibly over a 6 to 12 month cycle.' },
+  { name: 'Quarterly Collection (QC)', tag: 'Thrift', desc: 'Save daily or weekly, collected every quarter, and earn 2.5% interest on your savings.' },
+  { name: 'One-Year Lump-Sum Investment', tag: 'Investment', desc: 'Invest a lump sum for 12 months and earn 18% interest on the invested amount.' },
+  { name: 'Hire-Purchase: Electronics', tag: 'Hire-Purchase', desc: 'Get phones, laptops and home appliances now, and pay in weekly or monthly instalments.' },
 ]
 
 function greeting() {

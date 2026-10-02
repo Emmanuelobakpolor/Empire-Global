@@ -9,6 +9,8 @@ import Badge from '../../components/ui/Badge'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import Modal from '../../components/ui/Modal'
 import { useAuth } from '../../context/AuthContext'
+import { useDataStore } from '../../context/DataStoreContext'
+import { NextOfKinForm, EMPTY_NEXT_OF_KIN, nextOfKinErrors } from '../../components/customer/ApplicationForms'
 import { useToast } from '../../context/ToastContext'
 import { formatDate } from '../../utils/formatDate'
 
@@ -23,6 +25,12 @@ export default function Profile() {
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' })
 
+  const { customers, updateCustomer } = useDataStore()
+  const savedNextOfKin = customers.find((c) => c.id === user?.id)?.nextOfKin || user?.nextOfKin
+  const [nextOfKin, setNextOfKin] = useState(savedNextOfKin || EMPTY_NEXT_OF_KIN)
+  const [nokErrors, setNokErrors] = useState({})
+  const [savingNok, setSavingNok] = useState(false)
+
   const handleSave = async (e) => {
     e.preventDefault()
     setSaving(true)
@@ -30,6 +38,19 @@ export default function Profile() {
     updateProfile(form)
     setSaving(false)
     showToast('Profile updated successfully.', 'success')
+  }
+
+  const handleSaveNextOfKin = async (e) => {
+    e.preventDefault()
+    const errs = nextOfKinErrors(nextOfKin)
+    setNokErrors(errs)
+    if (Object.keys(errs).length) return
+    setSavingNok(true)
+    await new Promise((r) => setTimeout(r, 600))
+    updateCustomer(user.id, { nextOfKin })
+    updateProfile({ nextOfKin })
+    setSavingNok(false)
+    showToast('Next of kin saved.', 'success')
   }
 
   const handleChangePassword = (e) => {
@@ -62,6 +83,20 @@ export default function Profile() {
               <Input label="Phone Number" icon={Phone} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
               <div>
                 <Button type="submit" loading={saving}>Save Changes</Button>
+              </div>
+            </form>
+          </Card>
+
+          <Card>
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <h3 className="text-sm font-bold text-navy-800">Next of Kin</h3>
+              {!savedNextOfKin && <Badge status="pending">Not provided</Badge>}
+            </div>
+            <p className="text-xs text-navy-400 mb-5">Required for Savings and Investment plans.</p>
+            <form onSubmit={handleSaveNextOfKin} className="flex flex-col gap-4">
+              <NextOfKinForm value={nextOfKin} onChange={setNextOfKin} errors={nokErrors} />
+              <div>
+                <Button type="submit" loading={savingNok}>Save Next of Kin</Button>
               </div>
             </form>
           </Card>

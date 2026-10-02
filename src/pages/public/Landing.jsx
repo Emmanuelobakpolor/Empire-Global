@@ -18,6 +18,7 @@ import {
   Lock,
   Clock,
   Smartphone,
+  MapPin,
 } from 'lucide-react'
 import { useState } from 'react'
 import Logo from '../../components/Logo'
@@ -146,25 +147,87 @@ const TESTIMONIALS = [
 ]
 
 const FAQS = [
+  /* Account & Registration */
   {
-    question: 'Is my money safe with Empire Global?',
-    answer: 'Every transaction goes through a verification checkpoint before it reflects on your account, and your dashboard gives you full visibility into every step — from payment to approval.',
+    question: 'How do I create an account on Empire Global & Benefits?',
+    answer: 'Click "Get Started" and fill in your full name, email address, phone number and a password. Once your account is created, you can log in and start a plan from your dashboard.',
   },
   {
-    question: 'How long does payment verification take?',
-    answer: 'Most receipts are reviewed within a few hours. You can track the exact status of your payment — Pending, Under Review, or Approved — from your Transaction Details page at any time.',
+    question: 'Can I sign up or log in using my Google account?',
+    answer: 'Yes. On the sign-up or login page, choose "Continue with Google" to use your Google account instead of creating a separate password.',
   },
   {
-    question: 'Can I withdraw from my savings plan early?',
-    answer: 'Flexible plans like Flexi Save allow withdrawals anytime. Fixed-term plans are designed to be held for their full duration to earn the advertised return.',
+    question: 'What is an Agent Code and why do I need one during registration?',
+    answer: 'An Agent Code identifies the Empire Global agent who referred you. Entering it links your account to that agent so they can guide you and follow up on your plans.',
   },
   {
-    question: 'What documents do I need to get started?',
-    answer: 'Just your full name, email address and phone number to create an account. No paperwork is required to explore products or start a plan.',
+    question: 'How do I reset my password?',
+    answer: 'On the login page, click "Forgot Password?" and enter the email address on your account. We\'ll send you a link to set a new password.',
+  },
+
+  /* Products & Contributions */
+  {
+    question: 'What products are available?',
+    answer: (
+      <>
+        <p>All our products are managed from one dashboard:</p>
+        <ul>
+          <li><strong>One-Time Investment</strong> — One-Year Lump-Sum, and Two or More Years Lump-Sum.</li>
+          <li><strong>Periodic Investment</strong> — Monthly (MSP), Weekly (WSP) and Daily (DSP) Savings Investment Plans.</li>
+          <li><strong>Thrift Savings</strong> — Monthly Collection (MC), Quarterly Collection (QC) and Accessible Savings Account (ASA).</li>
+          <li><strong>Loans</strong> — Salary Advance, House Rent, Academic, Business, Phone/Gadget/Laptop and Home Appliances loans.</li>
+          <li><strong>Hire-Purchase</strong> — electronics, and tricycles and bikes, paid in instalments.</li>
+        </ul>
+      </>
+    ),
   },
   {
-    question: 'How do I contact support if I have an issue?',
-    answer: 'You can reach our support team directly via WhatsApp using the chat button in the corner of the screen, or through the Support page in your dashboard.',
+    question: 'How do I make a deposit or contribution?',
+    answer: 'Payment is to be made directly to the company\'s account.',
+  },
+  {
+    question: 'How long does it take for my payment to be verified?',
+    answer: 'Payments are verified within 1 to 30 minutes on working days.',
+  },
+  {
+    question: 'What are the withdrawal rules for each product?',
+    answer: (
+      <>
+        <p><strong>One-Time Investment:</strong> The plan can’t be terminated before maturity. Terminating early forfeits all interest, and terminating within the first 30 days also attracts a 5% penalty on the amount invested. Termination requests need 5 working days’ notice.</p>
+        <p><strong>Periodic Investment (MSP, WSP, DSP):</strong> Partial withdrawal is allowed after the 8th month of the 12-month contract. Full termination follows the same rules as One-Time Investment.</p>
+        <p><strong>Thrift:</strong> Monthly Collection pays out at the end of the month; you must give 24 hours’ notice to withdraw before the month ends. Quarterly Collection pays out every quarter. The Accessible Savings Account lets you withdraw at any time.</p>
+      </>
+    ),
+  },
+
+  /* Loans & Hire-Purchase */
+  {
+    question: 'What documents are required for a loan or hire-purchase application?',
+    answer: (
+      <ul>
+        <li>Passport photograph</li>
+        <li>Proof of address (utility bill, LAWMA bill, etc.)</li>
+        <li>Proof of ID</li>
+        <li>A completed application form, filled out at our physical office</li>
+      </ul>
+    ),
+  },
+  {
+    question: 'Which items can I obtain through Hire-Purchase?',
+    answer: (
+      <>
+        <p>Hire-purchase is limited to:</p>
+        <ul>
+          <li><strong>Electronics</strong> — mobile phones, laptops, gadgets and home appliances</li>
+          <li><strong>Vehicles</strong> — tricycles and bikes only (no cars or larger vehicles)</li>
+        </ul>
+        <p>Ownership transfers to you only after all instalments have been paid. Guarantor details are required with every application.</p>
+      </>
+    ),
+  },
+  {
+    question: 'How is my repayment schedule calculated?',
+    answer: 'The item you request determines the interest rate used to calculate your repayments.',
   },
 ]
 
@@ -800,9 +863,20 @@ export default function Landing() {
           <div>
             <h4 className="text-white font-semibold text-sm mb-4">Contact</h4>
             <ul className="space-y-2.5 text-sm text-navy-400">
-              <li>support@empireglobal.com</li>
-              <li>+234 700 000 0000</li>
-              <li>Victoria Island, Lagos, Nigeria</li>
+              <li>Info@empireglobalbenefits.com</li>
+              <li>+234 9068410302</li>
+              <li>
+                <a
+                  href="https://maps.google.com/?q=260+GOSHEN+HOUSE+IDIROKO+IKORODU+LAGOS"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-navy-300 hover:text-white transition-colors"
+                >
+                  <MapPin size={14} />
+                  260 GOSHEN HOUSE IDIROKO, IKORODU, LAGOS
+                </a>
+              </li>
+              <li>Monday – Friday, 8:00 AM – 5:00 PM (WAT)</li>
             </ul>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ChevronLeft, CheckCircle2, ArrowRight } from 'lucide-react'
+import { ChevronLeft, CheckCircle2, ArrowRight, ClipboardCheck, Info } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import EmptyState from '../../components/ui/EmptyState'
@@ -34,6 +34,7 @@ export default function ProductDetails() {
             <Icon size={30} />
           </span>
           <div className="flex-1">
+            {product.category && <p className="text-xs font-semibold uppercase tracking-wider text-navy-400 mb-1">{product.category}</p>}
             <h1 className="text-xl font-bold text-navy-900">{product.name}</h1>
             <p className="text-sm text-navy-400 mt-2 leading-relaxed">{product.description}</p>
           </div>
@@ -72,6 +73,48 @@ export default function ProductDetails() {
           ))}
         </ul>
       </Card>
+
+      {product.itemCategories?.length > 0 && (
+        <Card className="mb-6">
+          <h3 className="text-sm font-bold text-navy-800 mb-4">Eligible Items</h3>
+          <div className="flex flex-wrap gap-2">
+            {product.itemCategories.map((c) => (
+              <span key={c} className="text-xs font-semibold text-navy-700 bg-navy-50 rounded-full px-3 py-1.5">{c}</span>
+            ))}
+          </div>
+          {product.type === 'hire-purchase' && (
+            <p className="text-xs text-navy-400 mt-3">Hire-purchase covers electronics, and tricycles and bikes only. Cars and larger vehicles are not available.</p>
+          )}
+        </Card>
+      )}
+
+      {product.requirements?.length > 0 && (
+        <Card className="mb-6">
+          <h3 className="text-sm font-bold text-navy-800 mb-4">Requirements</h3>
+          <ul className="flex flex-col gap-3">
+            {product.requirements.map((r) => (
+              <li key={r} className="flex items-start gap-2.5 text-sm text-navy-600">
+                <ClipboardCheck size={17} className="text-navy-400 shrink-0 mt-0.5" />
+                {r}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      {product.clauses?.length > 0 && (
+        <Card className="mb-6">
+          <h3 className="text-sm font-bold text-navy-800 mb-4">Terms & Clauses</h3>
+          <ul className="flex flex-col gap-3">
+            {product.clauses.map((c) => (
+              <li key={c} className="flex items-start gap-2.5 text-sm text-navy-600">
+                <Info size={17} className="text-amber-500 shrink-0 mt-0.5" />
+                {c}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <div className="sticky bottom-4 sm:static">
         <Button

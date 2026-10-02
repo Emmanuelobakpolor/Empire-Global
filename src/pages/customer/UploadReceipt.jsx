@@ -9,12 +9,13 @@ import EmptyState from '../../components/ui/EmptyState'
 import { useDataStore } from '../../context/DataStoreContext'
 import { useToast } from '../../context/ToastContext'
 import { formatCurrency } from '../../utils/formatCurrency'
+import { resolveBankAccount } from '../../data/bankAccounts'
 
 export default function UploadReceipt() {
   const [searchParams] = useSearchParams()
   const ref = searchParams.get('ref')
   const navigate = useNavigate()
-  const { transactions, attachReceipt } = useDataStore()
+  const { transactions, attachReceipt, bankAccounts, accountAssignments } = useDataStore()
   const { showToast } = useToast()
 
   const transaction = transactions.find((t) => t.reference === ref)
@@ -36,7 +37,10 @@ export default function UploadReceipt() {
     if (!file) return
     setSubmitting(true)
     await new Promise((r) => setTimeout(r, 900))
-    attachReceipt(transaction.id, { fileName: file.name, uploadedAt: new Date().toISOString() })
+    // Keep a copy of the account the customer was told to pay into, for verification
+    const account = resolveBankAccount(bankAccounts, accountAssignments, transaction.productType)
+    const paidTo = account && { bankName: account.bankName, accountName: account.accountName, accountNumber: account.accountNumber }
+    attachReceipt(transaction.id, { fileName: file.name, uploadedAt: new Date().toISOString(), paidTo })
     setSubmitting(false)
     setSubmitted(true)
     showToast('Receipt submitted successfully.', 'success')

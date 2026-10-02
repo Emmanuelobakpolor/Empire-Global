@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Search, Eye, Ban, CheckCircle, MoreVertical } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import Input from '../../components/ui/Input'
@@ -7,6 +7,7 @@ import Select from '../../components/ui/Select'
 import Table, { Tr, Td } from '../../components/ui/Table'
 import Badge from '../../components/ui/Badge'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
+import AgentFilter, { AgentCell, useAgentFilter } from '../../components/admin/AgentFilter'
 import { useDataStore } from '../../context/DataStoreContext'
 import { useToast } from '../../context/ToastContext'
 import { formatDate } from '../../utils/formatDate'
@@ -23,6 +24,8 @@ export default function Customers() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [confirmTarget, setConfirmTarget] = useState(null)
+  const [searchParams] = useSearchParams()
+  const agentFilter = useAgentFilter(searchParams.get('agent') || '')
 
   const filtered = useMemo(() => {
     return customers.filter((c) => {
@@ -30,11 +33,12 @@ export default function Customers() {
         !search ||
         c.fullName.toLowerCase().includes(search.toLowerCase()) ||
         c.email.toLowerCase().includes(search.toLowerCase()) ||
-        c.id.toLowerCase().includes(search.toLowerCase())
+        c.id.toLowerCase().includes(search.toLowerCase()) ||
+        agentFilter.searchMatches(c.agentCode, search)
       const matchesStatus = !statusFilter || c.status === statusFilter
-      return matchesSearch && matchesStatus
+      return matchesSearch && matchesStatus && agentFilter.matches(c.agentCode)
     })
-  }, [customers, search, statusFilter])
+  }, [customers, search, statusFilter, agentFilter])
 
   const handleToggleSuspend = () => {
     if (!confirmTarget) return
@@ -50,18 +54,20 @@ export default function Customers() {
     <div>
       <PageHeader title="Customers" subtitle="Manage all registered Empire Global customers." />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-        <Input placeholder="Search by name, email or ID..." icon={Search} value={search} onChange={(e) => setSearch(e.target.value)} containerClassName="sm:col-span-2" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        <Input placeholder="Search name, email, ID or agent..." icon={Search} value={search} onChange={(e) => setSearch(e.target.value)} />
         <Select placeholder="Filter by status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} options={STATUS_OPTIONS} />
+        <AgentFilter filter={agentFilter} />
       </div>
 
-      <Table columns={['Customer ID', 'Name', 'Email', 'Phone', 'Status', 'Joined', 'Actions']}>
+      <Table columns={['Customer ID', 'Name', 'Email', 'Phone', 'Agent', 'Status', 'Joined', 'Actions']}>
         {filtered.map((c) => (
           <Tr key={c.id}>
             <Td className="font-mono text-xs">{c.id}</Td>
             <Td className="font-semibold text-navy-900">{c.fullName}</Td>
             <Td>{c.email}</Td>
             <Td>{c.phone}</Td>
+            <Td><AgentCell code={c.agentCode} /></Td>
             <Td><Badge status={c.status}>{c.status}</Badge></Td>
             <Td>{formatDate(c.joined)}</Td>
             <Td>

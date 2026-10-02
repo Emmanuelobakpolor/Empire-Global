@@ -5,6 +5,7 @@ import Badge from '../ui/Badge'
 import EmptyState from '../ui/EmptyState'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatDate } from '../../utils/formatDate'
+import { PlanPeriodCell } from '../PlanPeriod'
 import { Receipt } from 'lucide-react'
 
 export default function TransactionTable({ transactions, basePath = '/customer/transactions', showCustomer = false }) {
@@ -18,6 +19,7 @@ export default function TransactionTable({ transactions, basePath = '/customer/t
     'Product',
     'Amount',
     'Date',
+    'Plan Period',
     'Status',
     '',
   ]
@@ -31,6 +33,7 @@ export default function TransactionTable({ transactions, basePath = '/customer/t
           <Td>{t.productName}</Td>
           <Td className="font-semibold">{formatCurrency(t.amount)}</Td>
           <Td>{formatDate(t.date)}</Td>
+          <Td><PlanPeriodCell transaction={t} /></Td>
           <Td>
             <Badge status={t.status}>{t.status}</Badge>
           </Td>

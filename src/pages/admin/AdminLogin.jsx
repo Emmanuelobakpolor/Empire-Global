@@ -4,7 +4,7 @@ import { Mail, Lock, Info, ShieldCheck } from 'lucide-react'
 import Logo from '../../components/Logo'
 import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
-import { useAdminAuth, DEMO_ADMIN_EMAIL, DEMO_ADMIN_PASSWORD } from '../../context/AdminAuthContext'
+import { useAdminAuth, DEMO_ADMIN_EMAIL, DEMO_ADMIN_PASSWORD, DEMO_REGULAR_ADMIN_EMAIL } from '../../context/AdminAuthContext'
 import { useToast } from '../../context/ToastContext'
 
 export default function AdminLogin() {
@@ -27,7 +27,7 @@ export default function AdminLogin() {
     const result = await login(email, password)
     setLoading(false)
     if (result.success) {
-      showToast('Welcome back, Admin.', 'success')
+      showToast('Welcome back.', 'success')
       navigate('/admin/dashboard')
     } else {
       setError(result.error)
@@ -52,7 +52,10 @@ export default function AdminLogin() {
 
           <div className="flex items-start gap-2 bg-emerald-50 text-emerald-700 text-xs rounded-xl px-3.5 py-2.5 mb-6">
             <Info size={15} className="mt-0.5 shrink-0" />
-            <p>Demo login: <strong>{DEMO_ADMIN_EMAIL}</strong> / <strong>{DEMO_ADMIN_PASSWORD}</strong></p>
+            <div>
+              <p>Super Admin: <strong>{DEMO_ADMIN_EMAIL}</strong> / <strong>{DEMO_ADMIN_PASSWORD}</strong></p>
+              <p className="mt-0.5">Admin: <strong>{DEMO_REGULAR_ADMIN_EMAIL}</strong> / <strong>{DEMO_ADMIN_PASSWORD}</strong></p>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">

@@ -10,7 +10,7 @@ export const initialNotifications = [
   {
     id: 'n2',
     title: 'Payment Rejected',
-    message: 'Your Thrift Gold Plan payment (EMP-THR-20260801-018) was rejected. Reason: Receipt image was unclear.',
+    message: 'Your Monthly Collection (MC) payment (EMP-THR-20260801-018) was rejected. Reason: Receipt image was unclear.',
     date: '2026-08-02T09:10:00',
     read: false,
     type: 'error',

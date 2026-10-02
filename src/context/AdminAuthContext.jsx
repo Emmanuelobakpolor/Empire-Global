@@ -1,55 +1,59 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useState } from 'react'
+import { useDataStore } from './DataStoreContext'
+import { ROLES } from '../data/admins'
 
 const AdminAuthContext = createContext(null)
-const STORAGE_KEY = 'empire_admin_session'
+const STORAGE_KEY = 'empire_admin_session_id'
 
 export const DEMO_ADMIN_EMAIL = 'admin@empireglobal.com'
 export const DEMO_ADMIN_PASSWORD = 'admin123'
-
-const demoAdmin = {
-  id: 'ADM-001',
-  fullName: 'Sarah Johnson',
-  email: DEMO_ADMIN_EMAIL,
-  role: 'Super Admin',
-}
+export const DEMO_REGULAR_ADMIN_EMAIL = 'michael@empireglobal.com'
 
 export function AdminAuthProvider({ children }) {
-  const [admin, setAdmin] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
+  const { admins, setActor } = useDataStore()
+  const [adminId, setAdminId] = useState(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) setAdmin(JSON.parse(raw))
+      return localStorage.getItem(STORAGE_KEY)
     } catch {
-      // ignore
+      return null
     }
-    setLoading(false)
-  }, [])
+  })
+  const loading = false
 
-  const persist = (nextAdmin) => {
-    setAdmin(nextAdmin)
-    if (nextAdmin) localStorage.setItem(STORAGE_KEY, JSON.stringify(nextAdmin))
+  // Always read the live account, so a deactivated or deleted admin loses access immediately
+  const found = admins.find((a) => a.id === adminId)
+  const admin = found && found.status === 'active' ? found : null
+
+  // Set during render (it's only a ref) so page effects, which run before this
+  // provider's effects, already see who is acting.
+  setActor(admin)
+
+  const persist = (id) => {
+    setAdminId(id)
+    if (id) localStorage.setItem(STORAGE_KEY, id)
     else localStorage.removeItem(STORAGE_KEY)
   }
 
   const login = async (email, password) => {
     await new Promise((r) => setTimeout(r, 600))
-    if (email?.trim().toLowerCase() === DEMO_ADMIN_EMAIL && password === DEMO_ADMIN_PASSWORD) {
-      persist(demoAdmin)
-      return { success: true }
+    const account = admins.find((a) => a.email.toLowerCase() === email?.trim().toLowerCase())
+    if (!account || account.password !== password) {
+      return { success: false, error: 'Invalid admin email or password.' }
     }
-    if (email && password) {
-      persist({ ...demoAdmin, email })
-      return { success: true }
+    if (account.status !== 'active') {
+      return { success: false, error: 'This admin account has been deactivated. Contact a Super Admin.' }
     }
-    return { success: false, error: 'Please enter a valid admin email and password.' }
+    persist(account.id)
+    setActor(account)
+    return { success: true }
   }
 
   const logout = () => persist(null)
 
+  const isSuperAdmin = admin?.role === ROLES.SUPER_ADMIN
+
   return (
-    <AdminAuthContext.Provider value={{ admin, loading, isAuthenticated: !!admin, login, logout }}>
+    <AdminAuthContext.Provider value={{ admin, loading, isAuthenticated: !!admin, isSuperAdmin, login, logout }}>
       {children}
     </AdminAuthContext.Provider>
   )

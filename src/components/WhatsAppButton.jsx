@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 
 // Placeholder number — replace with the real Empire Global WhatsApp business line.
-const WHATSAPP_NUMBER = '2347000000000'
-const DEFAULT_MESSAGE = "Hi Empire Global, I'd like to know more about your financial products."
+const WHATSAPP_NUMBER = '2349068410302'
+const DEFAULT_MESSAGE = "Hi Empire Global & Benefits, I'd like to know more about your financial products."
 
 export default function WhatsAppButton() {
   const [dismissedHint, setDismissedHint] = useState(false)

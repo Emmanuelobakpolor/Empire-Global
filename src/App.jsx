@@ -16,6 +16,7 @@ import Landing from './pages/public/Landing'
 import Login from './pages/public/Login'
 import Register from './pages/public/Register'
 import ForgotPassword from './pages/public/ForgotPassword'
+import CompleteProfile from './pages/public/CompleteProfile'
 
 // Customer
 import Dashboard from './pages/customer/Dashboard'
@@ -48,6 +49,9 @@ import Reports from './pages/admin/Reports'
 import BankDetailsPage from './pages/admin/BankDetailsPage'
 import AuditLogs from './pages/admin/AuditLogs'
 import AdminSettings from './pages/admin/AdminSettings'
+import AdminManagement from './pages/admin/AdminManagement'
+import Agents from './pages/admin/Agents'
+import SuperAdminRoute from './routes/SuperAdminRoute'
 
 import NotFound from './pages/NotFound'
 
@@ -63,6 +67,7 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/complete-profile" element={<CompleteProfile />} />
 
               {/* Customer Portal */}
               <Route
@@ -103,6 +108,7 @@ export default function App() {
                 <Route path="dashboard" element={<AdminDashboard />} />
                 <Route path="customers" element={<Customers />} />
                 <Route path="customers/:id" element={<CustomerDetails />} />
+                <Route path="agents" element={<Agents />} />
                 <Route path="payments" element={<Payments />} />
                 <Route path="payments/:id" element={<PaymentDetails />} />
                 <Route path="transactions" element={<AdminTransactions />} />
@@ -111,6 +117,7 @@ export default function App() {
                 <Route path="reports" element={<Reports />} />
                 <Route path="bank-details" element={<BankDetailsPage />} />
                 <Route path="audit-logs" element={<AuditLogs />} />
+                <Route path="admins" element={<SuperAdminRoute><AdminManagement /></SuperAdminRoute>} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
 
