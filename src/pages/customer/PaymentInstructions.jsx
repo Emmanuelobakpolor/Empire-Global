@@ -9,6 +9,7 @@ import { useDataStore } from '../../context/DataStoreContext'
 import { useToast } from '../../context/ToastContext'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { resolveBankAccount } from '../../data/bankAccounts'
+import PlanPeriodCard from '../../components/PlanPeriod'
 
 export default function PaymentInstructions() {
   const [searchParams] = useSearchParams()
@@ -93,6 +94,8 @@ export default function PaymentInstructions() {
         </div>
         {account.notes && <p className="text-xs text-navy-500 mt-3"><strong>Note:</strong> {account.notes}</p>}
       </Card>
+
+      <PlanPeriodCard transaction={transaction} />
 
       <Card className="mb-6 !bg-amber-50 !border-amber-100">
         <p className="text-sm text-amber-800">

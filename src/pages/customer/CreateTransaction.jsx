@@ -377,6 +377,18 @@ export default function CreateTransaction() {
               <p className="text-xs text-navy-300">Transaction Reference</p>
               <p className="text-lg font-mono font-bold text-emerald-400 mt-1 tracking-wide">{reference}</p>
             </div>
+            <div className="grid grid-cols-3 gap-3 w-full mt-3 text-left">
+              {[
+                { label: 'Start Date', value: formatDate(period.start) },
+                { label: 'End Date', value: period.end ? formatDate(period.end) : 'No expiry' },
+                { label: 'Duration', value: formatTerm(chosenTerm) },
+              ].map((row) => (
+                <div key={row.label} className="rounded-xl border border-navy-100 px-3 py-2.5">
+                  <p className="text-[11px] text-navy-400">{row.label}</p>
+                  <p className="text-sm font-bold text-navy-900 mt-0.5">{row.value}</p>
+                </div>
+              ))}
+            </div>
             <Button
               className="mt-6"
               fullWidth

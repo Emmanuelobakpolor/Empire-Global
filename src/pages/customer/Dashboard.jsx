@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { PiggyBank, TrendingUp, Landmark, ShoppingBag, Receipt, ArrowRight, ArrowUpRight, Clock, Sparkles } from 'lucide-react'
+import { PiggyBank, TrendingUp, Landmark, ShoppingBag, Receipt, ArrowRight, ArrowUpRight, Clock, Sparkles, CalendarClock } from 'lucide-react'
 import StatCard from '../../components/ui/StatCard'
 import Card from '../../components/ui/Card'
 import CountUp from '../../components/ui/CountUp'
@@ -9,6 +9,8 @@ import { useDataStore } from '../../context/DataStoreContext'
 import { useCustomerAccount } from '../../hooks/useCustomerAccount'
 import Badge from '../../components/ui/Badge'
 import { formatCurrency } from '../../utils/formatCurrency'
+import { formatDate } from '../../utils/formatDate'
+import { planPeriod, periodStatus } from '../../utils/planPeriod'
 
 const QUICK_ACTIONS = [
   { to: '/customer/savings', label: 'Start Saving', icon: PiggyBank },
@@ -33,12 +35,19 @@ function greeting() {
 
 export default function Dashboard() {
   const { user } = useAuth()
-  const { transactions } = useDataStore()
+  const { transactions, products } = useDataStore()
   const account = useCustomerAccount()
 
   const allMine = transactions.filter((t) => t.customerId === user?.id)
   const myTransactions = allMine.slice(0, 5)
   const pendingApplications = allMine.filter((t) => ['draft', 'pending', 'processing'].includes(t.status))
+
+  // Plans ending in the next 30 days, plus ones that ended in the last 30 so a lapsed plan isn't missed
+  const endingSoon = allMine
+    .filter((t) => !['draft', 'rejected'].includes(t.status))
+    .map((t) => ({ txn: t, period: planPeriod(t, products) }))
+    .filter(({ period }) => period?.end && period.daysLeft !== null && period.daysLeft >= -30 && period.daysLeft <= 30)
+    .sort((a, b) => a.period.daysLeft - b.period.daysLeft)
 
   const savings = account?.savingsBalance || 0
   const investments = account?.investmentBalance || 0
@@ -158,6 +167,41 @@ export default function Dashboard() {
                     </Link>
                   </div>
                 </div>
+              )
+            })}
+          </div>
+        </Card>
+      )}
+
+      {endingSoon.length > 0 && (
+        <Card className="mb-6 animate-rise-in !p-0 overflow-hidden">
+          <div className="flex items-center gap-2 px-5 pt-5 pb-3">
+            <CalendarClock size={16} className="text-amber-500" />
+            <h3 className="text-sm font-bold text-navy-800">Plans Ending Soon</h3>
+            <span className="text-[11px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">{endingSoon.length}</span>
+          </div>
+          <div className="divide-y divide-navy-50">
+            {endingSoon.map(({ txn, period }) => {
+              const status = periodStatus(period)
+              return (
+                <Link
+                  key={txn.id}
+                  to={`/customer/transactions/${txn.id}`}
+                  className="group flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-navy-50/40"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-navy-900 truncate">{txn.productName}</p>
+                    <p className="text-xs text-navy-400">
+                      {formatDate(period.start)} → {formatDate(period.end)} · {formatCurrency(txn.amount)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge status={status.status} className="!normal-case">
+                      {period.state === 'expired' ? `Expired ${formatDate(period.end)}` : status.label}
+                    </Badge>
+                    <ArrowRight size={13} className="text-emerald-600 transition-transform duration-300 group-hover:translate-x-1" />
+                  </div>
+                </Link>
               )
             })}
           </div>
