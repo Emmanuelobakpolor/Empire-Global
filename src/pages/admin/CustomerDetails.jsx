@@ -1,6 +1,7 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ChevronLeft, Mail, Phone, Calendar, Receipt } from 'lucide-react'
 import Card from '../../components/ui/Card'
+import Avatar from '../../components/ui/Avatar'
 import StatCard from '../../components/ui/StatCard'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
@@ -39,9 +40,7 @@ export default function CustomerDetails() {
       <Card className="mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <span className="w-14 h-14 rounded-full bg-navy-900 text-white flex items-center justify-center text-lg font-bold shrink-0">
-              {customer.fullName.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()}
-            </span>
+            <Avatar src={customer.avatarUrl} name={customer.fullName} className="w-14 h-14 bg-navy-900 text-white text-lg" />
             <div>
               <h1 className="text-lg font-bold text-navy-900">{customer.fullName}</h1>
               <p className="text-xs text-navy-400 font-mono">{customer.id}</p>

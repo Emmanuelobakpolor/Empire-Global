@@ -324,6 +324,7 @@ export function DataStoreProvider({ children }) {
     agentCode: account.agentCode || null,
     authProvider: account.authProvider,
     joined: account.joined,
+    avatarUrl: account.avatarUrl ?? null,
     // The customer's own session doesn't report status changes made by admins
     ...(account.status && { status: account.status }),
     nextOfKin: account.nextOfKin ?? local?.nextOfKin ?? null,

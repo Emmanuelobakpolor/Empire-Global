@@ -6,6 +6,7 @@ import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import Button from '../../components/ui/Button'
 import LoadingState from '../../components/ui/LoadingState'
+import AvatarUploader from '../../components/ui/AvatarUploader'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useToast } from '../../context/ToastContext'
 import { setCachedPlatformSettings } from '../../hooks/usePlatformSettings'
@@ -174,6 +175,13 @@ function ProfileSettings() {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <SectionTitle title="Profile" description="Your name appears in the audit log and on payment reviews." />
+      <div className="flex items-center gap-4">
+        <AvatarUploader fallback="A" className="w-16 h-16 bg-emerald-500 text-white text-lg" ring="ring-4 ring-emerald-50" />
+        <div>
+          <p className="text-sm font-semibold text-navy-900">Profile picture</p>
+          <p className="text-xs text-navy-400">JPG, PNG or WebP, up to 5 MB. Shown in the top bar and to other admins.</p>
+        </div>
+      </div>
       <Input label="Full Name" icon={User} value={fullName} onChange={(e) => setFullName(e.target.value)} error={error} required />
       <Input label="Email" icon={Mail} value={admin?.email || ''} disabled hint="Ask a Super Admin to change your email." />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

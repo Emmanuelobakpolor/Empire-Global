@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { api, setSessionExpiredHandler } from '../utils/api'
+import { api, failure, setSessionExpiredHandler } from '../utils/api'
 
 // The account signed in to the Django session. Customers and admins share one
 // session cookie; AuthContext and AdminAuthContext each expose the role they own.
@@ -36,8 +36,26 @@ export function SessionProvider({ children }) {
     }
   }, [])
 
+  // Display picture: pass a File to upload or replace it, null to remove it
+  const updateAvatar = useCallback(async (file) => {
+    try {
+      let data
+      if (file) {
+        const form = new FormData()
+        form.append('avatar', file)
+        data = await api('/auth/me/avatar/', { method: 'POST', body: form })
+      } else {
+        data = await api('/auth/me/avatar/', { method: 'DELETE' })
+      }
+      setAccount(data.user)
+      return { success: true }
+    } catch (err) {
+      return failure(err)
+    }
+  }, [])
+
   return (
-    <SessionContext.Provider value={{ account, setAccount, loading, refresh, signOut }}>
+    <SessionContext.Provider value={{ account, setAccount, loading, refresh, signOut, updateAvatar }}>
       {children}
     </SessionContext.Provider>
   )

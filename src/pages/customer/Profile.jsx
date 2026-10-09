@@ -9,6 +9,7 @@ import Badge from '../../components/ui/Badge'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import Modal from '../../components/ui/Modal'
 import ChangeEmailModal from '../../components/customer/ChangeEmailModal'
+import AvatarUploader from '../../components/ui/AvatarUploader'
 import { useAuth } from '../../context/AuthContext'
 import { useDataStore } from '../../context/DataStoreContext'
 import { NextOfKinForm, EMPTY_NEXT_OF_KIN, nextOfKinErrors } from '../../components/customer/ApplicationForms'
@@ -177,12 +178,9 @@ export default function Profile() {
         <div>
           <Card padded={false} className="overflow-hidden">
             <div className="relative flex flex-col items-center text-center px-6 pt-8 pb-6 bg-gradient-to-b from-navy-50/60 to-transparent">
-              <div className="relative mb-4">
+              <div className="relative mb-3">
                 <span className="absolute -inset-1.5 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 opacity-20 blur-md" />
-                <span className="relative w-[72px] h-[72px] rounded-full bg-gradient-to-br from-navy-800 to-navy-950 text-white flex items-center justify-center text-xl font-bold ring-4 ring-white shadow-soft">
-                  {(user?.fullName || 'U').split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()}
-                </span>
-                <span className="absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white" />
+                <AvatarUploader className="relative w-[84px] h-[84px] bg-gradient-to-br from-navy-800 to-navy-950 text-white text-2xl" />
               </div>
               <p className="font-bold text-navy-900 text-base">{user?.fullName}</p>
               <p className="text-xs text-navy-400 mt-0.5">{user?.email}</p>

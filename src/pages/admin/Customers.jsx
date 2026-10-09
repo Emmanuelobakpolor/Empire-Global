@@ -6,6 +6,7 @@ import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
 import Table, { Tr, Td } from '../../components/ui/Table'
 import Badge from '../../components/ui/Badge'
+import Avatar from '../../components/ui/Avatar'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import AgentFilter, { AgentCell, useAgentFilter } from '../../components/admin/AgentFilter'
 import { useDataStore } from '../../context/DataStoreContext'
@@ -77,7 +78,12 @@ export default function Customers() {
         {filtered.map((c) => (
           <Tr key={c.id}>
             <Td className="font-mono text-xs">{c.id}</Td>
-            <Td className="font-semibold text-navy-900">{c.fullName}</Td>
+            <Td>
+              <span className="flex items-center gap-2.5 font-semibold text-navy-900">
+                <Avatar src={c.avatarUrl} name={c.fullName} className="w-8 h-8 bg-navy-100 text-navy-700 text-[11px]" />
+                {c.fullName}
+              </span>
+            </Td>
             <Td>{c.email}</Td>
             <Td>{c.phone}</Td>
             <Td><AgentCell code={c.agentCode} /></Td>

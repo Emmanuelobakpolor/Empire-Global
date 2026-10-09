@@ -8,6 +8,7 @@ import Modal from '../../components/ui/Modal'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import Table, { Tr, Td } from '../../components/ui/Table'
 import Badge from '../../components/ui/Badge'
+import Avatar from '../../components/ui/Avatar'
 import LoadingState from '../../components/ui/LoadingState'
 import { useDataStore } from '../../context/DataStoreContext'
 import { useAdminAuth } from '../../context/AdminAuthContext'
@@ -125,9 +126,14 @@ export default function AdminManagement() {
           return (
             <Tr key={a.id}>
               <Td className="font-mono text-xs">{a.id}</Td>
-              <Td className="font-semibold text-navy-900">
-                {a.fullName}
-                {isSelf && <span className="ml-1.5 text-xs font-normal text-navy-400">(you)</span>}
+              <Td>
+                <span className="flex items-center gap-2.5 font-semibold text-navy-900">
+                  <Avatar src={a.avatarUrl} name={a.fullName} fallback="A" className="w-8 h-8 bg-emerald-50 text-emerald-700 text-[11px]" />
+                  <span>
+                    {a.fullName}
+                    {isSelf && <span className="ml-1.5 text-xs font-normal text-navy-400">(you)</span>}
+                  </span>
+                </span>
               </Td>
               <Td>{a.email}</Td>
               <Td>

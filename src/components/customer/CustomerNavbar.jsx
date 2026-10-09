@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Menu, ChevronDown, LogOut, User, Settings } from 'lucide-react'
 import NotificationBell from '../notifications/NotificationBell'
+import Avatar from '../ui/Avatar'
 import { useAuth } from '../../context/AuthContext'
 
 export default function CustomerNavbar({ onMenuClick, title }) {
@@ -23,13 +24,6 @@ export default function CustomerNavbar({ onMenuClick, title }) {
     logout()
     navigate('/login')
   }
-
-  const initials = (user?.fullName || 'U')
-    .split(' ')
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
 
   return (
     <header className="sticky top-0 z-30 bg-slate-50/90 backdrop-blur border-b border-navy-100/70">
@@ -58,9 +52,7 @@ export default function CustomerNavbar({ onMenuClick, title }) {
               onClick={() => setMenuOpen((o) => !o)}
               className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-navy-100 transition-colors"
             >
-              <span className="w-9 h-9 rounded-full bg-navy-900 text-white flex items-center justify-center text-xs font-bold">
-                {initials}
-              </span>
+              <Avatar src={user?.avatarUrl} name={user?.fullName} className="w-9 h-9 bg-navy-900 text-white text-xs" />
               <ChevronDown size={16} className="text-navy-400 hidden sm:block" />
             </button>
             {menuOpen && (

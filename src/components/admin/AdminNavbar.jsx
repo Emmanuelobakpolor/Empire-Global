@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Menu, ChevronDown, LogOut } from 'lucide-react'
 import NotificationBell from '../notifications/NotificationBell'
+import Avatar from '../ui/Avatar'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 
 export default function AdminNavbar({ onMenuClick, title }) {
@@ -22,13 +23,6 @@ export default function AdminNavbar({ onMenuClick, title }) {
     logout()
     navigate('/admin/login')
   }
-
-  const initials = (admin?.fullName || 'A')
-    .split(' ')
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
 
   return (
     <header className="sticky top-0 z-30 bg-slate-50/90 backdrop-blur border-b border-navy-100/70">
@@ -52,9 +46,7 @@ export default function AdminNavbar({ onMenuClick, title }) {
               onClick={() => setMenuOpen((o) => !o)}
               className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-navy-100 transition-colors"
             >
-              <span className="w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold">
-                {initials}
-              </span>
+              <Avatar src={admin?.avatarUrl} name={admin?.fullName} fallback="A" className="w-9 h-9 bg-emerald-500 text-white text-xs" />
               <div className="hidden sm:block text-left">
                 <p className="text-xs font-semibold text-navy-800 leading-tight">{admin?.fullName}</p>
                 <p className="text-[11px] text-navy-400 leading-tight">{admin?.role}</p>
