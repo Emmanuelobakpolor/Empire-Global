@@ -1,13 +1,7 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { formatCurrency } from '../../../utils/formatCurrency'
-
-const data = [
-  { category: 'Savings', value: 3200000 },
-  { category: 'Investment', value: 8600000 },
-  { category: 'Thrift', value: 1450000 },
-  { category: 'Loans', value: 2100000 },
-  { category: 'Hire-Purchase', value: 4300000 },
-]
+import { productTypes } from '../../../data/products'
+import { ChartEmpty } from './TransactionsChart'
 
 const COLORS = ['#10B981', '#0B1B33', '#f59e0b', '#8b5cf6', '#f43f5e']
 
@@ -21,7 +15,19 @@ function CustomTooltip({ active, payload, label }) {
   )
 }
 
-export default function RevenueChart() {
+// Approved payments (money actually received) per product type
+export default function RevenueChart({ transactions = [] }) {
+  const data = productTypes.map((type) => ({
+    category: type.label,
+    value: transactions
+      .filter((t) => t.status === 'approved' && t.productType === type.value)
+      .reduce((sum, t) => sum + t.amount, 0),
+  }))
+
+  if (!data.some((d) => d.value)) {
+    return <ChartEmpty message="No approved payments yet." />
+  }
+
   return (
     <ResponsiveContainer width="100%" height={260}>
       <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>

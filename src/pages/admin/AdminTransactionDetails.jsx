@@ -4,6 +4,8 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import EmptyState from '../../components/ui/EmptyState'
+import LoadingState from '../../components/ui/LoadingState'
+import ReceiptPreview from '../../components/ReceiptPreview'
 import TransactionTimeline from '../../components/customer/TransactionTimeline'
 import ApplicationDetails from '../../components/admin/ApplicationDetails'
 import PlanPeriodCard from '../../components/PlanPeriod'
@@ -14,8 +16,10 @@ import { formatDate } from '../../utils/formatDate'
 export default function AdminTransactionDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { transactions } = useDataStore()
+  const { transactions, transactionsLoaded } = useDataStore()
   const transaction = transactions.find((t) => t.id === id)
+
+  if (!transaction && !transactionsLoaded) return <LoadingState label="Loading transaction..." />
 
   if (!transaction) {
     return (
@@ -67,6 +71,13 @@ export default function AdminTransactionDetails() {
       </Card>
 
       <PlanPeriodCard transaction={transaction} />
+
+      {transaction.receipt && (
+        <Card className="mb-6">
+          <h3 className="text-sm font-bold text-navy-800 mb-4">Payment Receipt</h3>
+          <ReceiptPreview receipt={transaction.receipt} />
+        </Card>
+      )}
 
       <ApplicationDetails transaction={transaction} />
 

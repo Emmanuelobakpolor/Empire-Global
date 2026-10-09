@@ -51,6 +51,7 @@ function TextArea({ label, value, onChange, error, hint, rows = 3 }) {
 export default function ProductFormModal({ open, onClose, onSave, initialData }) {
   const [form, setForm] = useState(EMPTY_FORM)
   const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -97,11 +98,12 @@ export default function ProductFormModal({ open, onClose, onSave, initialData })
     return Object.keys(errs).length === 0
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!validate()) return
     const benefits = fromLines(form.benefits)
-    onSave({
+    setSaving(true)
+    const result = await onSave({
       ...form,
       category: form.category.trim() || productTypes.find((t) => t.value === form.type)?.label,
       minAmount: Number(form.minAmount),
@@ -114,8 +116,11 @@ export default function ProductFormModal({ open, onClose, onSave, initialData })
       benefits: benefits.length ? benefits : ['Transparent tracking'],
       clauses: fromLines(form.clauses),
       requirements: fromLines(form.requirements),
-      itemCategories: isHirePurchase ? form.itemCategories : undefined,
+      itemCategories: isHirePurchase ? form.itemCategories : [],
     })
+    setSaving(false)
+    // The server checks limits and lists too; show anything it rejects on the form
+    if (result && !result.success) setErrors(result.fieldErrors || {})
   }
 
   return (
@@ -128,7 +133,7 @@ export default function ProductFormModal({ open, onClose, onSave, initialData })
       footer={
         <>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit}>{initialData ? 'Save Changes' : 'Add Product'}</Button>
+          <Button onClick={handleSubmit} loading={saving}>{initialData ? 'Save Changes' : 'Add Product'}</Button>
         </>
       }
     >

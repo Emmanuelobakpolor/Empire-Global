@@ -326,3 +326,41 @@ tbody.stagger-rows > tr:nth-child(n+6) { animation-delay: 150ms; }
   transform-origin: left;
   animation: bar-fill 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
 }
+
+/* Creating a transaction: a progress bar that fills over the generating screen (3s),
+   then the success check pops in and the reference glows into view */
+@keyframes progress-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.animate-progress-3s {
+  transform-origin: left;
+  animation: progress-fill 3s cubic-bezier(0.45, 0, 0.25, 1) both;
+}
+
+@keyframes check-pop {
+  0% { opacity: 0; transform: scale(0.4); }
+  60% { opacity: 1; transform: scale(1.12); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.animate-check-pop {
+  animation: check-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes reference-reveal {
+  0% { opacity: 0; letter-spacing: 0.35em; filter: blur(6px); }
+  100% { opacity: 1; letter-spacing: 0.05em; filter: blur(0); }
+}
+.animate-reference-reveal {
+  animation: reference-reveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both;
+}
+
+/* Notification bell: a short ring when there's something unread */
+@keyframes bell-ring {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(14deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(8deg); }
+  60% { transform: rotate(-6deg); }
+  75% { transform: rotate(3deg); }
+}

@@ -3,33 +3,12 @@ export const ROLES = {
   ADMIN: 'Admin',
 }
 
-// Mock admin accounts. Passwords are plain text only because there is no backend yet.
-export const initialAdmins = [
-  {
-    id: 'ADM-001',
-    fullName: 'Sarah Johnson',
-    email: 'admin@empireglobal.com',
-    password: 'admin123',
-    role: ROLES.SUPER_ADMIN,
-    status: 'active',
-    createdAt: '2024-01-10',
-  },
-  {
-    id: 'ADM-002',
-    fullName: 'Michael Bassey',
-    email: 'michael@empireglobal.com',
-    password: 'admin123',
-    role: ROLES.ADMIN,
-    status: 'active',
-    createdAt: '2024-06-03',
-  },
-  {
-    id: 'ADM-003',
-    fullName: 'Ngozi Eze',
-    email: 'ngozi@empireglobal.com',
-    password: 'admin123',
-    role: ROLES.ADMIN,
-    status: 'inactive',
-    createdAt: '2025-02-18',
-  },
-]
+// Admin accounts live on the backend, which uses role codes; the UI shows these labels
+const ROLE_CODES = { [ROLES.SUPER_ADMIN]: 'super_admin', [ROLES.ADMIN]: 'admin' }
+const ROLE_LABELS = { super_admin: ROLES.SUPER_ADMIN, admin: ROLES.ADMIN }
+
+export const roleLabel = (code) => ROLE_LABELS[code] || null
+export const roleCode = (label) => ROLE_CODES[label]
+
+// An admin from the API, with its role as a UI label
+export const fromApiAdmin = (admin) => ({ ...admin, role: roleLabel(admin.role) })

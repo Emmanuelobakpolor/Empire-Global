@@ -14,10 +14,10 @@ import {
   documentsComplete, guarantorErrors, nextOfKinErrors, guarantorRows, nextOfKinRows, documentRows,
 } from '../../components/customer/ApplicationForms'
 import { useDataStore } from '../../context/DataStoreContext'
+import GeneratingTransaction, { GENERATING_MS } from '../../components/customer/GeneratingTransaction'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import { formatCurrency } from '../../utils/formatCurrency'
-import { generateReference } from '../../utils/generateReference'
 import { productTypes } from '../../data/products'
 import { formatDate } from '../../utils/formatDate'
 import { addMonths, formatTerm } from '../../utils/planPeriod'
@@ -37,7 +37,7 @@ const STEP_LABELS = {
 export default function CreateTransaction() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { products, customers, createTransaction, updateCustomer } = useDataStore()
+  const { products, productsLoaded, customers, createTransaction, updateCustomer } = useDataStore()
   const { user, updateProfile } = useAuth()
   const { showToast } = useToast()
 
@@ -47,6 +47,7 @@ export default function CreateTransaction() {
   const [planFrequency, setPlanFrequency] = useState('')
   const [termMonths, setTermMonths] = useState(null)
   const [reference, setReference] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   // Loan / hire-purchase application
   const [documents, setDocuments] = useState({})
@@ -82,9 +83,10 @@ export default function CreateTransaction() {
   ]
   const current = steps[step]
 
+  // Clear an unknown product (e.g. from an old link) once the catalogue has loaded
   useEffect(() => {
-    if (productId && !product) setProductId('')
-  }, [productId, product])
+    if (productsLoaded && productId && !product) setProductId('')
+  }, [productsLoaded, productId, product])
 
   // Terms and item choice belong to one product, so start over when it changes
   useEffect(() => {
@@ -105,46 +107,47 @@ export default function CreateTransaction() {
     return true
   }
 
-  const generate = () => {
-    const ref = generateReference(product.type)
-    const now = new Date().toISOString()
-    const txn = {
-      id: `t${Date.now()}`,
-      reference: ref,
-      customerId: user?.id,
-      customerName: user?.fullName,
+  // The server assigns the reference, plan dates and status
+  const generate = async () => {
+    // The generating screen stays up for at least GENERATING_MS while the server works
+    const startedAt = Date.now()
+    setSubmitting(true)
+    // Application files are uploaded with the transaction; the server stores and checks them
+    const { idDocument, ...guarantorDetails } = guarantor
+    const files = needsApplication
+      ? { ...Object.fromEntries(Object.entries(documents).map(([key, doc]) => [key, doc?.file])), guarantorId: idDocument?.file }
+      : {}
+    const result = await createTransaction({
       productId: product.id,
-      productName: product.name,
-      productType: product.type,
       amount: Number(amount),
-      date: now.slice(0, 10),
-      // The plan runs from the day the customer completes this transaction for the chosen term
       termMonths: chosenTerm,
-      startDate: period.start,
-      endDate: period.end,
-      status: 'draft',
-      receipt: null,
-      ...(needsApplication && { application: { documents, guarantor, ...(isHirePurchase && { item }), submittedAt: now } }),
-      ...(hasClauses && { termsAcceptedAt: now }),
+      termsAccepted: hasClauses ? acceptedTerms : false,
+      ...(needsApplication && { application: { guarantor: guarantorDetails, ...(isHirePurchase && { item }) } }),
       ...(needsNextOfKin && { nextOfKin }),
-      timeline: [
-        { label: needsApplication ? 'Application Submitted' : 'Transaction Created', done: true, date: now },
-        { label: 'Payment Instructions Generated', done: true, date: now },
-        { label: 'Receipt Uploaded', done: false },
-        { label: 'Awaiting Verification', done: false },
-        { label: 'Payment Approved', done: false },
-      ],
+    }, files)
+    if (!result.success) {
+      // Errors show straight away, without waiting for the animation to finish
+      setSubmitting(false)
+      // e.g. a document the server couldn't read, or an amount outside the product's limits
+      const documentErrors = result.data?.documents
+      showToast(Array.isArray(documentErrors) ? documentErrors[0] : result.error, 'error')
+      return false
     }
-    createTransaction(txn)
     if (needsNextOfKin && saveNextOfKin) {
       updateCustomer(user.id, { nextOfKin })
-      updateProfile({ nextOfKin })
+      updateProfile({ nextOfKin }).then((saved) => {
+        if (!saved.success) showToast(`Next of kin wasn't saved to your profile: ${saved.error}`, 'error')
+      })
     }
-    setReference(ref)
+    const remaining = GENERATING_MS - (Date.now() - startedAt)
+    if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining))
+    setSubmitting(false)
+    setReference(result.transaction.reference)
     showToast(needsApplication ? 'Application submitted successfully.' : 'Transaction reference generated successfully.', 'success')
+    return true
   }
 
-  const handleNext = () => {
+  const handleNext = async () => {
     // Forms validate on Continue so the customer sees what's missing
     const stepErrors =
       current === 'item' ? itemErrors(item)
@@ -153,7 +156,7 @@ export default function CreateTransaction() {
         : {}
     setErrors(stepErrors)
     if (Object.keys(stepErrors).length) return
-    if (current === 'review') generate()
+    if (current === 'review' && !(await generate())) return
     setStep((s) => Math.min(s + 1, steps.length - 1))
   }
 
@@ -308,7 +311,7 @@ export default function CreateTransaction() {
           </div>
         )}
 
-        {current === 'review' && product && (
+        {current === 'review' && product && !submitting && (
           <div>
             <h3 className="text-base font-bold text-navy-900 mb-1">Review {needsApplication ? 'Application' : 'Transaction'}</h3>
             <p className="text-sm text-navy-400 mb-5">
@@ -366,18 +369,23 @@ export default function CreateTransaction() {
           </div>
         )}
 
+        {submitting && <GeneratingTransaction isApplication={needsApplication} />}
+
         {current === 'done' && (
-          <div className="flex flex-col items-center text-center py-4">
-            <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mb-4">
-              <Check size={30} />
+          <div className="flex flex-col items-center text-center py-4 animate-rise-in">
+            <div className="relative w-16 h-16 mb-4">
+              <span className="absolute inset-0 rounded-full bg-emerald-200 animate-ping opacity-40 [animation-iteration-count:2]" aria-hidden="true" />
+              <span className="relative w-16 h-16 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center animate-check-pop">
+                <Check size={30} />
+              </span>
             </div>
             <h3 className="text-lg font-bold text-navy-900">{needsApplication ? 'Application Submitted' : 'Transaction Reference Generated'}</h3>
             <p className="text-sm text-navy-400 mt-1">Your transaction has been created successfully.</p>
             <div className="bg-navy-900 rounded-xl px-6 py-4 mt-5 w-full">
               <p className="text-xs text-navy-300">Transaction Reference</p>
-              <p className="text-lg font-mono font-bold text-emerald-400 mt-1 tracking-wide">{reference}</p>
+              <p className="text-lg font-mono font-bold text-emerald-400 mt-1 tracking-wide animate-reference-reveal">{reference}</p>
             </div>
-            <div className="grid grid-cols-3 gap-3 w-full mt-3 text-left">
+            <div className="grid grid-cols-3 gap-3 w-full mt-3 text-left stagger-pop">
               {[
                 { label: 'Start Date', value: formatDate(period.start) },
                 { label: 'End Date', value: period.end ? formatDate(period.end) : 'No expiry' },
@@ -401,12 +409,12 @@ export default function CreateTransaction() {
         )}
       </Card>
 
-      {current !== 'done' && (
+      {current !== 'done' && !submitting && (
         <div className="flex items-center justify-between mt-6">
           <Button variant="outline" icon={ChevronLeft} onClick={handleBack} disabled={step === 0}>
             Back
           </Button>
-          <Button icon={ChevronRight} iconPosition="right" onClick={handleNext} disabled={!canGoNext()}>
+          <Button icon={ChevronRight} iconPosition="right" onClick={handleNext} disabled={!canGoNext()} loading={submitting}>
             {current === 'review' ? (needsApplication ? 'Submit Application' : 'Generate Transaction') : 'Continue'}
           </Button>
         </div>

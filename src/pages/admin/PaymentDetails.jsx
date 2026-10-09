@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
-  ChevronLeft, FileText, CheckCircle2, XCircle, User, Calendar, Hash, BadgeCheck,
+  ChevronLeft, CheckCircle2, XCircle, User, Calendar, Hash, BadgeCheck,
   Eye, ThumbsUp, ThumbsDown, ShieldCheck, Clock,
 } from 'lucide-react'
 import Card from '../../components/ui/Card'
@@ -11,6 +11,8 @@ import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import EmptyState from '../../components/ui/EmptyState'
+import LoadingState from '../../components/ui/LoadingState'
+import ReceiptPreview from '../../components/ReceiptPreview'
 import { AgentCell } from '../../components/admin/AgentFilter'
 import ApplicationDetails from '../../components/admin/ApplicationDetails'
 import PlanPeriodCard from '../../components/PlanPeriod'
@@ -32,7 +34,7 @@ const TRAIL_STYLE = {
 export default function PaymentDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { transactions, customers, recordSlipView, recommendPayment, approvePayment, rejectPayment } = useDataStore()
+  const { transactions, transactionsLoaded, customers, recordSlipView, recommendPayment, approvePayment, rejectPayment } = useDataStore()
   const { admin, isSuperAdmin } = useAdminAuth()
   const { showToast } = useToast()
   const transaction = transactions.find((t) => t.id === id)
@@ -50,6 +52,8 @@ export default function PaymentDetails() {
     if (transaction) recordSlipView(transaction.id)
   }, [transaction?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  if (!transaction && !transactionsLoaded) return <LoadingState label="Loading payment..." />
+
   if (!transaction) {
     return (
       <EmptyState title="Payment not found" action={<Link to="/admin/payments"><Button>Back to Payments</Button></Link>} />
@@ -62,16 +66,17 @@ export default function PaymentDetails() {
   const trail = transaction.slipTrail || []
   const isResolved = transaction.status === 'approved' || transaction.status === 'rejected'
 
-  const simulate = async (fn) => {
+  // Runs a review action on the server; the dialog stays open if it fails
+  const run = async (action, onSuccess) => {
     setProcessing(true)
-    await new Promise((r) => setTimeout(r, 700))
-    fn()
+    const result = await action()
     setProcessing(false)
+    if (result.success) onSuccess()
+    else showToast(result.error, 'error')
   }
 
   const handleRecommend = () =>
-    simulate(() => {
-      recommendPayment(transaction.id, recommendDecision, note.trim())
+    run(() => recommendPayment(transaction.id, recommendDecision, note.trim()), () => {
       showToast(
         recommendDecision === 'approve'
           ? 'Recommended for approval. A Super Admin will give final approval.'
@@ -83,18 +88,16 @@ export default function PaymentDetails() {
     })
 
   const handleApprove = () =>
-    simulate(() => {
-      approvePayment(transaction.id)
+    run(() => approvePayment(transaction.id), () => {
       setApproveOpen(false)
       showToast('Payment approved. The customer has been credited.', 'success')
     })
 
   const handleReject = () =>
-    simulate(() => {
-      rejectPayment(transaction.id, reason)
+    run(() => rejectPayment(transaction.id, reason), () => {
       setRejectOpen(false)
       setReason('')
-      showToast('Payment Rejected', 'error')
+      showToast('Payment rejected. The customer has been notified.', 'success')
     })
 
   return (
@@ -137,17 +140,7 @@ export default function PaymentDetails() {
 
         <div>
           <p className="text-xs text-navy-400 mb-2">Receipt</p>
-          <div className="rounded-xl border border-navy-100 bg-navy-50/50 p-4 flex items-center gap-3">
-            <span className="w-11 h-11 rounded-lg bg-white border border-navy-100 flex items-center justify-center shrink-0">
-              <FileText size={20} className="text-navy-400" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-navy-800 truncate">{transaction.receipt?.fileName || 'No receipt uploaded'}</p>
-              {transaction.receipt?.uploadedAt && (
-                <p className="text-xs text-navy-400">Uploaded {formatDate(transaction.receipt.uploadedAt, { withTime: true })}</p>
-              )}
-            </div>
-          </div>
+          <ReceiptPreview receipt={transaction.receipt} />
         </div>
 
         {transaction.status === 'rejected' && transaction.rejectionReason && (

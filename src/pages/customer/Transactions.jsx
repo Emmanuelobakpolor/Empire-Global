@@ -11,6 +11,7 @@ import { useDataStore } from '../../context/DataStoreContext'
 import { productTypes } from '../../data/products'
 
 const STATUS_OPTIONS = [
+  { value: 'draft', label: 'Awaiting payment' },
   { value: 'pending', label: 'Pending' },
   { value: 'processing', label: 'Processing' },
   { value: 'approved', label: 'Approved' },
@@ -25,7 +26,7 @@ export default function Transactions() {
   const [statusFilter, setStatusFilter] = useState('')
 
   const myTransactions = useMemo(
-    () => transactions.filter((t) => t.customerId === user?.id && t.status !== 'draft'),
+    () => transactions.filter((t) => t.customerId === user?.id),
     [transactions, user]
   )
 

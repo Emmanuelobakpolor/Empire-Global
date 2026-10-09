@@ -29,8 +29,9 @@ import FaqAccordion from '../../components/FaqAccordion'
 import AnimatedCounter from '../../components/AnimatedCounter'
 import SmartImage from '../../components/SmartImage'
 import { PRODUCT_ICONS, PRODUCT_COLORS } from '../../components/customer/ProductCard'
-import { initialProducts } from '../../data/products'
+import { useDataStore } from '../../context/DataStoreContext'
 import { PRODUCT_IMAGES, SECTION_IMAGES, AVATARS } from '../../data/images'
+import { usePlatformSettings } from '../../hooks/usePlatformSettings'
 
 const NAV_LINKS = [
   { href: '#products', label: 'Products' },
@@ -247,6 +248,9 @@ function SectionEyebrow({ children, tone = 'light' }) {
 
 export default function Landing() {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const { supportEmail, supportPhone } = usePlatformSettings()
+  // The live catalogue from the server
+  const { products } = useDataStore()
 
   return (
     <div className="min-h-screen bg-white overflow-x-clip">
@@ -463,7 +467,7 @@ export default function Landing() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {PRODUCT_SUMMARIES.map((p, idx) => {
             const Icon = PRODUCT_ICONS[p.type]
-            const product = initialProducts.find((prod) => prod.type === p.type)
+            const product = products.find((prod) => prod.type === p.type)
             return (
               <Reveal key={p.type} delay={(idx % 4) + 1}>
                 <Link
@@ -863,8 +867,8 @@ export default function Landing() {
           <div>
             <h4 className="text-white font-semibold text-sm mb-4">Contact</h4>
             <ul className="space-y-2.5 text-sm text-navy-400">
-              <li>Info@empireglobalbenefits.com</li>
-              <li>+234 9068410302</li>
+              <li>{supportEmail}</li>
+              <li>{supportPhone}</li>
               <li>
                 <a
                   href="https://maps.google.com/?q=260+GOSHEN+HOUSE+IDIROKO+IKORODU+LAGOS"

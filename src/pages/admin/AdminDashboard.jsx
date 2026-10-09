@@ -13,6 +13,7 @@ import RevenueChart from '../../components/admin/charts/RevenueChart'
 import { useDataStore } from '../../context/DataStoreContext'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatDate, timeAgo } from '../../utils/formatDate'
+import { monthOverMonth } from '../../utils/monthChange'
 
 export default function AdminDashboard() {
   const store = useDataStore()
@@ -28,6 +29,12 @@ export default function AdminDashboard() {
   const approvedTotal = transactions.filter((t) => t.status === 'approved').reduce((sum, t) => sum + t.amount, 0)
   const recentTransactions = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6)
   const recentActivity = auditLogs.slice(0, 5)
+
+  // Real month-over-month changes (hidden when last month has nothing to compare with)
+  const approvedTxns = transactions.filter((t) => t.status === 'approved')
+  const customerTrend = monthOverMonth(customers, (c) => c.joined)
+  const transactionTrend = monthOverMonth(transactions, (t) => t.date)
+  const approvedTrend = monthOverMonth(approvedTxns, (t) => t.date, (t) => t.amount)
 
   return (
     <div>
@@ -51,20 +58,20 @@ export default function AdminDashboard() {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 stagger-children">
-        <StatCard label="Total Customers" value={customers.length.toLocaleString()} icon={Users} delta={6.3} tone="navy" />
-        <StatCard label="Pending Payments" value={pendingPayments.length} icon={Clock} delta={-3.1} tone="amber" />
-        <StatCard label="Approved Payments" value={formatCurrency(approvedTotal, { compact: true })} icon={CheckCircle2} delta={12.4} tone="emerald" />
-        <StatCard label="Total Transactions" value={transactions.length.toLocaleString()} icon={Receipt} delta={8.9} tone="navy" />
+        <StatCard label="Total Customers" value={customers.length.toLocaleString()} icon={Users} delta={customerTrend} deltaLabel="new vs last month" tone="navy" />
+        <StatCard label="Pending Payments" value={pendingPayments.length} icon={Clock} tone="amber" />
+        <StatCard label="Approved Payments" value={formatCurrency(approvedTotal, { compact: true })} icon={CheckCircle2} delta={approvedTrend} tone="emerald" />
+        <StatCard label="Total Transactions" value={transactions.length.toLocaleString()} icon={Receipt} delta={transactionTrend} tone="navy" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 animate-rise-in">
         <Card>
           <h3 className="text-sm font-bold text-navy-800 mb-4">Transaction Volume</h3>
-          <TransactionsChart />
+          <TransactionsChart transactions={transactions} />
         </Card>
         <Card>
           <h3 className="text-sm font-bold text-navy-800 mb-4">Revenue by Product</h3>
-          <RevenueChart />
+          <RevenueChart transactions={transactions} />
         </Card>
       </div>
 

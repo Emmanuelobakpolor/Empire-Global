@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Menu, Bell, ChevronDown, LogOut } from 'lucide-react'
+import { Menu, ChevronDown, LogOut } from 'lucide-react'
+import NotificationBell from '../notifications/NotificationBell'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 
 export default function AdminNavbar({ onMenuClick, title }) {
@@ -44,10 +45,7 @@ export default function AdminNavbar({ onMenuClick, title }) {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <button className="relative p-2.5 rounded-xl text-navy-500 hover:bg-navy-100 transition-colors" aria-label="Notifications">
-            <Bell size={19} />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-slate-50" />
-          </button>
+          <NotificationBell basePath="/admin" />
 
           <div className="relative" ref={menuRef}>
             <button

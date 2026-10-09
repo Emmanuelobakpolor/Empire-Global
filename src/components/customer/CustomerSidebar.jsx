@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import {
+  ArrowDownToLine,
   LayoutDashboard,
   TrendingUp,
   PiggyBank,
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { to: '/customer/hire-purchase', label: 'Hire-Purchase', icon: ShoppingBag },
   { to: '/customer/transactions', label: 'Transactions', icon: Receipt },
   { to: '/customer/upload-receipt', label: 'Payment Upload', icon: UploadCloud },
+  { to: '/customer/withdrawals', label: 'Withdrawals', icon: ArrowDownToLine },
   { to: '/customer/profile', label: 'Profile', icon: User },
 ]
 

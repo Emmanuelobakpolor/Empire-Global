@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Search, Eye, Ban, CheckCircle, MoreVertical } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
@@ -19,11 +19,18 @@ const STATUS_OPTIONS = [
 ]
 
 export default function Customers() {
-  const { customers, suspendCustomer } = useDataStore()
+  const { customers, suspendCustomer, refreshCustomers } = useDataStore()
   const { showToast } = useToast()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [confirmTarget, setConfirmTarget] = useState(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    refreshCustomers().then((result) => {
+      if (!result.success) showToast(result.error, 'error')
+    })
+  }, [])
   const [searchParams] = useSearchParams()
   const agentFilter = useAgentFilter(searchParams.get('agent') || '')
 
@@ -40,13 +47,19 @@ export default function Customers() {
     })
   }, [customers, search, statusFilter, agentFilter])
 
-  const handleToggleSuspend = () => {
+  const handleToggleSuspend = async () => {
     if (!confirmTarget) return
-    suspendCustomer(confirmTarget.id)
-    showToast(
-      confirmTarget.status === 'suspended' ? 'Customer reactivated successfully.' : 'Customer suspended successfully.',
-      'success'
-    )
+    setSaving(true)
+    const result = await suspendCustomer(confirmTarget.id)
+    setSaving(false)
+    if (result.success) {
+      showToast(
+        confirmTarget.status === 'suspended' ? 'Customer reactivated successfully.' : 'Customer suspended successfully.',
+        'success'
+      )
+    } else {
+      showToast(result.error, 'error')
+    }
     setConfirmTarget(null)
   }
 
@@ -75,13 +88,13 @@ export default function Customers() {
                 <Link to={`/admin/customers/${c.id}`} className="p-1.5 rounded-lg text-navy-400 hover:text-navy-800 hover:bg-navy-50" title="View">
                   <Eye size={16} />
                 </Link>
-                <button
+                {c.status !== 'pending' && <button
                   onClick={() => setConfirmTarget(c)}
                   className={`p-1.5 rounded-lg hover:bg-navy-50 ${c.status === 'suspended' ? 'text-emerald-500 hover:text-emerald-700' : 'text-red-400 hover:text-red-600'}`}
                   title={c.status === 'suspended' ? 'Reactivate' : 'Suspend'}
                 >
                   {c.status === 'suspended' ? <CheckCircle size={16} /> : <Ban size={16} />}
-                </button>
+                </button>}
               </div>
             </Td>
           </Tr>
@@ -93,9 +106,12 @@ export default function Customers() {
         onClose={() => setConfirmTarget(null)}
         onConfirm={handleToggleSuspend}
         title={confirmTarget?.status === 'suspended' ? 'Reactivate this customer?' : 'Suspend this customer?'}
-        description={`This will ${confirmTarget?.status === 'suspended' ? 're-enable' : 'restrict'} ${confirmTarget?.fullName}'s account access.`}
+        description={confirmTarget?.status === 'suspended'
+          ? `${confirmTarget?.fullName} will be able to log in again.`
+          : `${confirmTarget?.fullName} will be signed out and won't be able to log in until reactivated.`}
         confirmLabel={confirmTarget?.status === 'suspended' ? 'Reactivate' : 'Suspend'}
         variant={confirmTarget?.status === 'suspended' ? 'accent' : 'danger'}
+        loading={saving}
       />
     </div>
   )

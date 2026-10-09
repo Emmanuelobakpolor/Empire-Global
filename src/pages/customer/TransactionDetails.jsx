@@ -1,11 +1,14 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ChevronLeft, FileText, User, Calendar, Hash } from 'lucide-react'
+import { ChevronLeft, FileText, User, Calendar, Hash, UploadCloud } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import EmptyState from '../../components/ui/EmptyState'
+import LoadingState from '../../components/ui/LoadingState'
+import ReceiptPreview from '../../components/ReceiptPreview'
 import TransactionTimeline from '../../components/customer/TransactionTimeline'
 import PlanPeriodCard from '../../components/PlanPeriod'
+import PaymentAccountCard from '../../components/customer/PaymentAccountCard'
 import { useDataStore } from '../../context/DataStoreContext'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatDate } from '../../utils/formatDate'
@@ -13,8 +16,10 @@ import { formatDate } from '../../utils/formatDate'
 export default function TransactionDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { transactions } = useDataStore()
+  const { transactions, transactionsLoaded } = useDataStore()
   const transaction = transactions.find((t) => t.id === id)
+
+  if (!transaction && !transactionsLoaded) return <LoadingState label="Loading transaction..." />
 
   if (!transaction) {
     return (
@@ -41,7 +46,9 @@ export default function TransactionDetails() {
             <p className="text-xs text-navy-400 font-mono">{transaction.reference}</p>
             <h1 className="text-xl font-bold text-navy-900 mt-1">{transaction.productName}</h1>
           </div>
-          <Badge status={transaction.status} className="!text-sm !px-3 !py-1.5">{transaction.status}</Badge>
+          <Badge status={transaction.status === 'draft' ? 'awaiting' : transaction.status} className="!text-sm !px-3 !py-1.5">
+            {transaction.status === 'draft' ? 'Awaiting payment' : transaction.status}
+          </Badge>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-navy-50">
@@ -70,7 +77,26 @@ export default function TransactionDetails() {
         )}
       </Card>
 
+      {/* Until a decision is made, keep the account to pay into one tap away */}
+      {!['approved', 'rejected'].includes(transaction.status) && (
+        <>
+          <PaymentAccountCard transaction={transaction} />
+          {transaction.status === 'draft' && (
+            <Link to={`/customer/upload-receipt?ref=${transaction.reference}`} className="block mb-6">
+              <Button size="lg" fullWidth icon={UploadCloud} disabled={!transaction.paymentAccount}>I Have Made Payment</Button>
+            </Link>
+          )}
+        </>
+      )}
+
       <PlanPeriodCard transaction={transaction} />
+
+      {transaction.receipt && (
+        <Card className="mb-6">
+          <h3 className="text-sm font-bold text-navy-800 mb-4">Your Receipt</h3>
+          <ReceiptPreview receipt={transaction.receipt} />
+        </Card>
+      )}
 
       <Card>
         <h3 className="text-sm font-bold text-navy-800 mb-5">Transaction Timeline</h3>

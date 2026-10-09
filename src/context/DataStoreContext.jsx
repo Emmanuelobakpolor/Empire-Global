@@ -1,477 +1,384 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
-import { initialCustomers } from '../data/customers'
-import { initialProducts, CATALOG_VERSION } from '../data/products'
-import { initialTransactions } from '../data/transactions'
-import { initialNotifications } from '../data/notifications'
-import { initialAuditLogs } from '../data/auditLogs'
-import { initialBankAccounts, initialAccountAssignments } from '../data/bankAccounts'
-import { initialAdmins, ROLES } from '../data/admins'
-import { initialAgents, findAgent, nextAgentCode } from '../data/agents'
+import { ROLES, fromApiAdmin, roleCode } from '../data/admins'
+import { findAgent } from '../data/agents'
+import { api, failure } from '../utils/api'
 
 const DataStoreContext = createContext(null)
-// v2 adds admins, customer agent codes and payment slip review trails
-const STORAGE_KEY = 'empire_data_store_v2'
 
-// A repeat view by the same admin within this window isn't logged again
-const VIEW_DEDUPE_MS = 10 * 60 * 1000
+// Everything here now comes from the Django API, so nothing is kept in the browser.
+// This was the key used while the app ran on mock data; old copies are cleared on load.
+const LEGACY_STORAGE_KEY = 'empire_data_store_v2'
 
-// Which customer balance an approved payment of each product type credits.
-// Hire-purchase pays for goods, so it doesn't move a balance.
-const BALANCE_KEY_BY_TYPE = {
-  savings: 'savingsBalance',
-  thrift: 'savingsBalance',
-  investment: 'investmentBalance',
-  loan: 'outstandingLoan',
-}
-
-function applyApprovedAmount(customer, txn) {
-  const key = BALANCE_KEY_BY_TYPE[txn.productType]
-  if (!key) return customer
-  const next = { ...customer, [key]: (customer[key] || 0) + txn.amount }
-  return { ...next, totalBalance: (next.savingsBalance || 0) + (next.investmentBalance || 0) }
-}
-
-function loadSeed() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      // Fill in collections added after this browser's data was saved
-      const parsed = JSON.parse(raw)
-      const saved = { ...defaultStore(), ...parsed }
-      // Products saved before the official catalogue (no `category`) are replaced by it
-      if (!saved.products.some((p) => p.category)) saved.products = initialProducts
-      // Refresh plan options (duration, lengths, frequency) on catalogue products when the
-      // catalogue changes; other admin edits and admin-added products are kept
-      if (parsed.catalogVersion !== CATALOG_VERSION) {
-        saved.products = saved.products.map((p) => {
-          const seed = initialProducts.find((s) => s.id === p.id)
-          if (seed) return { ...p, duration: seed.duration, termOptions: seed.termOptions, frequency: seed.frequency }
-          return 'termOptions' in p ? p : { ...p, termOptions: null }
-        })
-        saved.catalogVersion = CATALOG_VERSION
-      }
-      return saved
-    }
-  } catch {
-    // ignore corrupted storage, fall through to defaults
-  }
-  return defaultStore()
-}
-
-function defaultStore() {
+function emptyStore() {
   return {
-    customers: initialCustomers,
-    products: initialProducts,
-    transactions: initialTransactions,
-    notifications: initialNotifications,
-    auditLogs: initialAuditLogs,
-    bankAccounts: initialBankAccounts,
-    accountAssignments: initialAccountAssignments,
-    admins: initialAdmins,
-    agents: initialAgents,
-    catalogVersion: CATALOG_VERSION,
+    // Admin portal: every customer. Customer portal: just the signed-in customer.
+    customers: [],
+    products: [],
+    productsLoaded: false,
+    transactions: [],
+    transactionsLoaded: false,
+    // Customer: their own requests. Admin: everyone's, with the review trail
+    withdrawals: [],
+    withdrawalsLoaded: false,
+    notifications: [],
+    // From the server, so it's right even beyond the 100 most recent notifications loaded
+    unreadCount: 0,
+    // Written by the server as admins act; the portal only reads them
+    auditLogs: [],
+    bankAccounts: [],
+    accountAssignments: {},
+    // Super Admins only
+    admins: [],
+    agents: [],
   }
 }
 
 export function DataStoreProvider({ children }) {
-  const [store, setStore] = useState(loadSeed)
+  const [store, setStore] = useState(emptyStore)
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(store))
-  }, [store])
+    try {
+      localStorage.removeItem(LEGACY_STORAGE_KEY)
+    } catch {
+      // storage unavailable; nothing to clear
+    }
+    refreshProducts()
+  }, [])
 
-  // The signed-in admin, set by AdminAuthProvider. Used to attribute audit entries
-  // and to enforce role permissions on admin-only actions.
+  // The signed-in admin, set by AdminAuthProvider, for role checks before calling the API
+  // (the server enforces the same rules).
   const actorRef = useRef(null)
   const setActor = (admin) => {
     actorRef.current = admin
   }
   const isSuperAdmin = () => actorRef.current?.role === ROLES.SUPER_ADMIN
 
-  const agentCodeFor = (customerId) => store.customers.find((c) => c.id === customerId)?.agentCode || null
+  const patch = (updates) => setStore((prev) => ({ ...prev, ...updates }))
 
-  const addAuditLog = (entry) => {
-    const actor = actorRef.current
-    setStore((prev) => ({
-      ...prev,
-      auditLogs: [
-        {
-          id: `a${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
-          date: new Date().toISOString(),
-          user: actor?.fullName || 'System',
-          role: actor?.role || null,
-          status: 'info',
-          ...entry,
-        },
-        ...prev.auditLogs,
-      ],
-    }))
+  // Runs an API call and returns { success, ...data } or the failure shape pages expect.
+  // Admin changes are written to the audit log by the server, so refresh it afterwards.
+  const call = async (path, options, { audited = false } = {}) => {
+    try {
+      const data = await api(path, options)
+      if (audited) refreshAuditLogs()
+      return { success: true, ...(data || {}) }
+    } catch (err) {
+      return failure(err)
+    }
   }
 
-  const addNotification = (entry) => {
-    setStore((prev) => ({
-      ...prev,
-      notifications: [
-        { id: `n${Date.now()}`, date: new Date().toISOString(), read: false, ...entry },
-        ...prev.notifications,
-      ],
-    }))
+  // ---- Audit log (admin portal, read-only) ----
+  const refreshAuditLogs = async () => {
+    const result = await call('/admin/audit-logs/')
+    if (result.success) patch({ auditLogs: result.auditLogs })
+    return result
+  }
+
+  // ---- Products ----
+  // Customers and the public site see active products; admins see the whole catalogue.
+  const refreshProducts = async (scope = 'public') => {
+    const result = await call(scope === 'admin' ? '/admin/products/' : '/products/')
+    patch(result.success ? { products: result.products, productsLoaded: true } : { productsLoaded: true })
+    return result
+  }
+
+  const replaceProduct = (product) =>
+    setStore((prev) => ({ ...prev, products: prev.products.map((p) => (p.id === product.id ? product : p)) }))
+
+  const addProduct = async (data) => {
+    const result = await call('/admin/products/', { method: 'POST', body: data }, { audited: true })
+    if (result.success) setStore((prev) => ({ ...prev, products: [...prev.products, result.product] }))
+    return result
+  }
+
+  const updateProduct = async (id, data) => {
+    const result = await call(`/admin/products/${id}/`, { method: 'PATCH', body: data }, { audited: true })
+    if (result.success) replaceProduct(result.product)
+    return result
+  }
+
+  const toggleProductStatus = async (id) => {
+    const product = store.products.find((p) => p.id === id)
+    if (!product) return { success: false, error: 'Product not found.' }
+    const status = product.status === 'active' ? 'disabled' : 'active'
+    const result = await call(`/admin/products/${id}/`, { method: 'PATCH', body: { status } }, { audited: true })
+    if (result.success) replaceProduct(result.product)
+    return result
+  }
+
+  // Products customers have used can't be deleted (the server answers product_in_use)
+  const deleteProduct = async (id) => {
+    const result = await call(`/admin/products/${id}/`, { method: 'DELETE' }, { audited: true })
+    if (result.success) setStore((prev) => ({ ...prev, products: prev.products.filter((p) => p.id !== id) }))
+    return result
   }
 
   // ---- Transactions ----
-  const createTransaction = (txn) => {
-    setStore((prev) => ({ ...prev, transactions: [txn, ...prev.transactions] }))
+  // Customers load their own; admins load everyone's, with the slip review trail.
+  const replaceTransaction = (txn) =>
+    setStore((prev) => ({ ...prev, transactions: prev.transactions.map((t) => (t.id === txn.id ? txn : t)) }))
+
+  const refreshTransactions = async (scope = 'customer') => {
+    const result = await call(scope === 'admin' ? '/admin/transactions/' : '/transactions/')
+    patch(result.success ? { transactions: result.transactions, transactionsLoaded: true } : { transactionsLoaded: true })
+    return result
   }
 
-  const attachReceipt = (transactionId, receipt) => {
-    setStore((prev) => ({
-      ...prev,
-      transactions: prev.transactions.map((t) =>
-        t.id === transactionId
-          ? {
-              ...t,
-              receipt,
-              status: 'pending',
-              timeline: t.timeline.map((step) =>
-                step.label === 'Receipt Uploaded'
-                  ? { ...step, done: true, date: new Date().toISOString() }
-                  : step.label === 'Awaiting Verification'
-                  ? { ...step, current: true }
-                  : step
-              ),
-            }
-          : t
-      ),
-    }))
+  // The server checks the product's limits, plan length and terms, and assigns the
+  // reference, dates and payment account. Application documents are uploaded with it:
+  // pass `files` as { key: File }.
+  const createTransaction = async (payload, files = {}) => {
+    const entries = Object.entries(files).filter(([, file]) => file)
+    let body = payload
+    if (entries.length) {
+      body = new FormData()
+      body.append('payload', JSON.stringify(payload))
+      entries.forEach(([key, file]) => body.append(`document.${key}`, file))
+    }
+    const result = await call('/transactions/', { method: 'POST', body })
+    if (result.success) setStore((prev) => ({ ...prev, transactions: [result.transaction, ...prev.transactions] }))
+    return result
+  }
+
+  const attachReceipt = async (reference, file) => {
+    const form = new FormData()
+    form.append('file', file)
+    const result = await call(`/transactions/${reference}/upload-receipt/`, { method: 'POST', body: form })
+    if (result.success) replaceTransaction(result.transaction)
+    return result
   }
 
   // ---- Payment slip review ----
   // Admins view and recommend; only a Super Admin's final decision credits or rejects.
-  // Every step is appended to the transaction's slipTrail and to the audit log.
-  const appendTrail = (transactionId, step) => {
-    const actor = actorRef.current
-    const entry = { by: actor?.fullName || 'System', role: actor?.role || null, at: new Date().toISOString(), ...step }
-    setStore((prev) => ({
-      ...prev,
-      transactions: prev.transactions.map((t) =>
-        t.id === transactionId ? { ...t, slipTrail: [...(t.slipTrail || []), entry] } : t
-      ),
-    }))
+  // The server keeps the slip trail, credits balances and writes the audit log.
+  const findTxn = (id) => store.transactions.find((t) => t.id === id)
+
+  const reviewAction = async (transactionId, action, body) => {
+    const txn = findTxn(transactionId)
+    if (!txn) return { success: false, error: 'Payment not found.' }
+    const result = await call(`/admin/transactions/${txn.reference}/${action}/`, { method: 'POST', body }, { audited: true })
+    if (result.success) replaceTransaction(result.transaction)
+    return result
   }
 
-  // Also checked in memory, because the store state read here can be one render stale
-  const recentViewsRef = useRef({})
   const recordSlipView = (transactionId) => {
-    const actor = actorRef.current
-    const txn = store.transactions.find((t) => t.id === transactionId)
-    if (!actor || !txn) return
-    const key = `${transactionId}:${actor.id}`
-    const recentlyViewed =
-      Date.now() - (recentViewsRef.current[key] || 0) < VIEW_DEDUPE_MS ||
-      (txn.slipTrail || []).some(
-        (s) => s.action === 'viewed' && s.by === actor.fullName && Date.now() - new Date(s.at).getTime() < VIEW_DEDUPE_MS
-      )
-    if (recentlyViewed) return
-    recentViewsRef.current[key] = Date.now()
-    appendTrail(transactionId, { action: 'viewed' })
-    addAuditLog({
-      action: 'Payment Slip Viewed',
-      reference: txn.reference,
-      agentCode: agentCodeFor(txn.customerId),
-      status: 'info',
-      details: `Viewed ${txn.productName} payment slip of ₦${txn.amount.toLocaleString()} for ${txn.customerName}.`,
-    })
+    if (actorRef.current) reviewAction(transactionId, 'view')
   }
 
   // decision: 'approve' | 'reject'
-  const recommendPayment = (transactionId, decision, note) => {
-    const txn = store.transactions.find((t) => t.id === transactionId)
-    if (!txn || txn.status === 'approved' || txn.status === 'rejected') return
-    const approve = decision === 'approve'
-    appendTrail(transactionId, { action: approve ? 'recommended_approval' : 'recommended_rejection', note: note || undefined })
-    addAuditLog({
-      action: approve ? 'Payment Recommended for Approval' : 'Payment Recommended for Rejection',
-      reference: txn.reference,
-      agentCode: agentCodeFor(txn.customerId),
-      status: approve ? 'info' : 'warning',
-      details: `Recommended ${approve ? 'approval' : 'rejection'} of ${txn.productName} payment of ₦${txn.amount.toLocaleString()} for ${txn.customerName}. Awaiting Super Admin final approval.${note ? ` Note: ${note}` : ''}`,
-    })
-  }
+  const recommendPayment = (transactionId, decision, note) =>
+    reviewAction(transactionId, 'recommend', { decision, note: note || '' })
 
-  const approvePayment = (transactionId, note) => {
-    if (!isSuperAdmin()) return
-    const txn = store.transactions.find((t) => t.id === transactionId)
-    if (!txn || txn.status === 'approved') return
-    setStore((prev) => ({
-      ...prev,
-      customers: prev.customers.map((c) => (c.id === txn.customerId ? applyApprovedAmount(c, txn) : c)),
-      transactions: prev.transactions.map((t) =>
-        t.id === transactionId
-          ? {
-              ...t,
-              status: 'approved',
-              timeline: t.timeline.map((step) =>
-                step.label === 'Awaiting Verification'
-                  ? { ...step, done: true, current: false }
-                  : step.label === 'Payment Approved'
-                  ? { ...step, done: true, date: new Date().toISOString() }
-                  : step
-              ),
-            }
-          : t
-      ),
-    }))
-    appendTrail(transactionId, { action: 'approved', note: note || undefined })
-    addAuditLog({
-      action: 'Payment Approved',
-      reference: txn.reference,
-      agentCode: agentCodeFor(txn.customerId),
-      status: 'success',
-      details: `Final approval of ${txn.productName} payment of ₦${txn.amount.toLocaleString()} for ${txn.customerName}. Customer credited.`,
-    })
-    addNotification({
-      title: 'Payment Approved',
-      message: `Your ${txn.productName} payment of ₦${txn.amount.toLocaleString()} (${txn.reference}) has been approved.`,
-      type: 'success',
-    })
+  const approvePayment = async (transactionId, note) => {
+    if (!isSuperAdmin()) return { success: false, error: 'Only a Super Admin can give final approval.' }
+    const result = await reviewAction(transactionId, 'approve', { note: note || '' })
+    // The customer's balance changed on the server
+    if (result.success) refreshCustomers()
+    return result
   }
 
   const rejectPayment = (transactionId, reason) => {
-    if (!isSuperAdmin()) return
-    const txn = store.transactions.find((t) => t.id === transactionId)
-    if (!txn || txn.status === 'rejected') return
-    setStore((prev) => ({
-      ...prev,
-      transactions: prev.transactions.map((t) =>
-        t.id === transactionId
-          ? {
-              ...t,
-              status: 'rejected',
-              rejectionReason: reason || 'Payment could not be verified.',
-              timeline: t.timeline.map((step) =>
-                step.label === 'Awaiting Verification'
-                  ? { ...step, done: true, current: false }
-                  : step
-              ).concat(
-                t.timeline.some((s) => s.label === 'Payment Rejected')
-                  ? []
-                  : [{ label: 'Payment Rejected', done: true, rejected: true, date: new Date().toISOString() }]
-              ),
-            }
-          : t
-      ),
-    }))
-    appendTrail(transactionId, { action: 'rejected', note: reason || undefined })
-    addAuditLog({
-      action: 'Payment Rejected',
-      reference: txn.reference,
-      agentCode: agentCodeFor(txn.customerId),
-      status: 'error',
-      details: `Final rejection of ${txn.productName} payment of ₦${txn.amount.toLocaleString()} for ${txn.customerName}. Reason: ${reason || 'Not specified.'}`,
-    })
-    addNotification({
-      title: 'Payment Rejected',
-      message: `Your ${txn.productName} payment (${txn.reference}) was rejected. Reason: ${reason || 'Not specified.'}`,
-      type: 'error',
-    })
+    if (!isSuperAdmin()) return Promise.resolve({ success: false, error: 'Only a Super Admin can reject a payment.' })
+    return reviewAction(transactionId, 'reject', { note: reason || '' })
   }
 
-  // ---- Agents (Admin and Super Admin) ----
-  // Agents are deactivated rather than deleted, so customers and history linked
-  // to their code keep pointing at a real record.
-  const createAgent = (data) => {
-    if (!actorRef.current) return { success: false, error: 'You must be signed in as an admin.' }
-    const agent = {
-      code: nextAgentCode(store.agents),
-      name: data.name.trim(),
-      phone: data.phone.trim(),
-      location: data.location.trim(),
-      status: 'active',
-      createdAt: new Date().toISOString().slice(0, 10),
+  // ---- Withdrawals ----
+  // Customers request from a plan; an admin recommends, a Super Admin approves (the balance is
+  // deducted on the server) or rejects, and an admin marks it paid with the transfer reference.
+  const replaceWithdrawal = (wd) =>
+    setStore((prev) => ({ ...prev, withdrawals: prev.withdrawals.map((w) => (w.id === wd.id ? { ...w, ...wd } : w)) }))
+
+  const refreshWithdrawals = async (scope = 'customer') => {
+    const result = await call(scope === 'admin' ? '/admin/withdrawals/' : '/withdrawals/')
+    patch(result.success ? { withdrawals: result.withdrawals, withdrawalsLoaded: true } : { withdrawalsLoaded: true })
+    return result
+  }
+
+  // The customer's approved plans, each with what can be withdrawn today and why not
+  const getWithdrawablePlans = () => call('/withdrawals/plans/')
+
+  // The server prices a withdrawal (penalty, payout, earliest date) using the product's rules
+  const quoteWithdrawal = (planReference, amount) =>
+    call('/withdrawals/quote/', { method: 'POST', body: { planReference, amount: amount === '' ? null : amount } })
+
+  const requestWithdrawal = async (payload) => {
+    const result = await call('/withdrawals/', { method: 'POST', body: payload })
+    if (result.success) setStore((prev) => ({ ...prev, withdrawals: [result.withdrawal, ...prev.withdrawals] }))
+    return result
+  }
+
+  const cancelWithdrawal = async (reference) => {
+    const result = await call(`/withdrawals/${reference}/cancel/`, { method: 'POST' })
+    if (result.success) replaceWithdrawal(result.withdrawal)
+    return result
+  }
+
+  const getAdminWithdrawal = (reference) => call(`/admin/withdrawals/${reference}/`)
+
+  const withdrawalAction = async (reference, action, body) => {
+    const result = await call(`/admin/withdrawals/${reference}/${action}/`, { method: 'POST', body }, { audited: true })
+    if (result.success) {
+      replaceWithdrawal(result.withdrawal)
+      // Approval moves the customer's balance on the server
+      if (action === 'approve') refreshCustomers()
     }
-    setStore((prev) => ({ ...prev, agents: [...prev.agents, agent] }))
-    addAuditLog({
-      action: 'Agent Created',
-      reference: agent.code,
-      agentCode: agent.code,
-      status: 'success',
-      details: `Created agent ${agent.name} (${agent.code}) in ${agent.location}.`,
-    })
-    return { success: true, agent }
+    return result
   }
 
-  const updateAgent = (code, data) => {
-    if (!actorRef.current) return { success: false, error: 'You must be signed in as an admin.' }
-    const updates = { name: data.name.trim(), phone: data.phone.trim(), location: data.location.trim() }
-    setStore((prev) => ({ ...prev, agents: prev.agents.map((a) => (a.code === code ? { ...a, ...updates } : a)) }))
-    addAuditLog({
-      action: 'Agent Updated',
-      reference: code,
-      agentCode: code,
-      status: 'info',
-      details: `Updated agent ${updates.name} (${code}).`,
-    })
-    return { success: true }
+  // ---- Agents ----
+  // Agents are deactivated rather than deleted, so customers linked to them stay intact.
+  const replaceAgent = (agent) =>
+    setStore((prev) => ({ ...prev, agents: prev.agents.map((a) => (a.code === agent.code ? agent : a)) }))
+
+  const refreshAgents = async () => {
+    const result = await call('/admin/agents/')
+    if (result.success) patch({ agents: result.agents })
+    return result
   }
 
-  const toggleAgentStatus = (code) => {
-    if (!actorRef.current) return
+  const agentPayload = (data) => ({ name: data.name.trim(), phone: data.phone.trim(), location: data.location.trim() })
+
+  const createAgent = async (data) => {
+    const result = await call('/admin/agents/', { method: 'POST', body: agentPayload(data) }, { audited: true })
+    if (result.success) setStore((prev) => ({ ...prev, agents: [...prev.agents, result.agent] }))
+    return result
+  }
+
+  const updateAgent = async (code, data) => {
+    const result = await call(`/admin/agents/${code}/`, { method: 'PATCH', body: agentPayload(data) }, { audited: true })
+    if (result.success) replaceAgent(result.agent)
+    return result
+  }
+
+  const toggleAgentStatus = async (code) => {
     const agent = findAgent(store.agents, code)
-    if (!agent) return
-    const nextStatus = agent.status === 'active' ? 'inactive' : 'active'
-    setStore((prev) => ({ ...prev, agents: prev.agents.map((a) => (a.code === code ? { ...a, status: nextStatus } : a)) }))
-    addAuditLog({
-      action: nextStatus === 'active' ? 'Agent Activated' : 'Agent Deactivated',
-      reference: code,
-      agentCode: code,
-      status: nextStatus === 'active' ? 'info' : 'error',
-      details: `Agent ${agent.name} (${code}) was ${nextStatus === 'active' ? 'activated' : 'deactivated'}.`,
-    })
+    if (!agent) return { success: false, error: 'Agent not found.' }
+    const status = agent.status === 'active' ? 'inactive' : 'active'
+    const result = await call(`/admin/agents/${code}/`, { method: 'PATCH', body: { status } }, { audited: true })
+    if (result.success) replaceAgent(result.agent)
+    return result
   }
 
-  // ---- Admin accounts (Super Admin only) ----
-  const createAdmin = (data) => {
+  // ---- Admin accounts (Super Admins only) ----
+  const replaceAdmin = (admin) =>
+    setStore((prev) => ({ ...prev, admins: prev.admins.map((a) => (a.id === admin.id ? admin : a)) }))
+
+  const refreshAdmins = async () => {
+    const result = await call('/admin/admins/')
+    if (result.success) patch({ admins: result.admins.map(fromApiAdmin) })
+    return result
+  }
+
+  const adminPayload = (data) => ({
+    fullName: data.fullName.trim(),
+    email: data.email.trim().toLowerCase(),
+    role: roleCode(data.role),
+    ...(data.password ? { password: data.password } : {}),
+  })
+
+  const createAdmin = async (data) => {
     if (!isSuperAdmin()) return { success: false, error: 'Only a Super Admin can create admins.' }
-    const email = data.email.trim().toLowerCase()
-    if (store.admins.some((a) => a.email.toLowerCase() === email)) {
-      return { success: false, error: 'An admin with this email already exists.' }
-    }
-    const newAdmin = {
-      id: `ADM-${String(Date.now()).slice(-5)}`,
-      fullName: data.fullName.trim(),
-      email,
-      password: data.password,
-      role: data.role,
-      status: 'active',
-      createdAt: new Date().toISOString().slice(0, 10),
-    }
-    setStore((prev) => ({ ...prev, admins: [...prev.admins, newAdmin] }))
-    addAuditLog({
-      action: 'Admin Created',
-      reference: newAdmin.id,
-      status: 'success',
-      details: `Created ${newAdmin.role} account for ${newAdmin.fullName} (${newAdmin.email}).`,
-    })
-    return { success: true }
+    const result = await call('/admin/admins/', { method: 'POST', body: adminPayload(data) }, { audited: true })
+    if (result.success) setStore((prev) => ({ ...prev, admins: [...prev.admins, fromApiAdmin(result.admin)] }))
+    return result
   }
 
-  const updateAdmin = (id, data) => {
+  const updateAdmin = async (id, data) => {
     if (!isSuperAdmin()) return { success: false, error: 'Only a Super Admin can edit admins.' }
-    const email = data.email.trim().toLowerCase()
-    if (store.admins.some((a) => a.id !== id && a.email.toLowerCase() === email)) {
-      return { success: false, error: 'An admin with this email already exists.' }
-    }
+    const body = adminPayload(data)
+    // A Super Admin can't change their own role (the server refuses it too)
+    if (id === actorRef.current?.id) delete body.role
+    const result = await call(`/admin/admins/${id}/`, { method: 'PATCH', body }, { audited: true })
+    if (result.success) replaceAdmin(fromApiAdmin(result.admin))
+    return result
+  }
+
+  const toggleAdminStatus = async (id) => {
+    if (!isSuperAdmin() || id === actorRef.current?.id) return { success: false, error: 'You cannot change your own status.' }
     const target = store.admins.find((a) => a.id === id)
-    // A Super Admin can't demote themselves and lock everyone out of admin management
-    const role = id === actorRef.current?.id ? target.role : data.role
-    const updates = { fullName: data.fullName.trim(), email, role, ...(data.password ? { password: data.password } : {}) }
-    setStore((prev) => ({ ...prev, admins: prev.admins.map((a) => (a.id === id ? { ...a, ...updates } : a)) }))
-    addAuditLog({
-      action: 'Admin Updated',
-      reference: id,
-      status: 'info',
-      details: `Updated ${updates.fullName}'s account${target.role !== role ? ` (role changed from ${target.role} to ${role})` : ''}.`,
-    })
-    return { success: true }
+    if (!target) return { success: false, error: 'Admin not found.' }
+    const status = target.status === 'active' ? 'inactive' : 'active'
+    const result = await call(`/admin/admins/${id}/`, { method: 'PATCH', body: { status } }, { audited: true })
+    if (result.success) replaceAdmin(fromApiAdmin(result.admin))
+    return result
   }
 
-  const toggleAdminStatus = (id) => {
-    if (!isSuperAdmin() || id === actorRef.current?.id) return
-    const target = store.admins.find((a) => a.id === id)
-    if (!target) return
-    const nextStatus = target.status === 'active' ? 'inactive' : 'active'
-    setStore((prev) => ({ ...prev, admins: prev.admins.map((a) => (a.id === id ? { ...a, status: nextStatus } : a)) }))
-    addAuditLog({
-      action: nextStatus === 'active' ? 'Admin Activated' : 'Admin Deactivated',
-      reference: id,
-      status: nextStatus === 'active' ? 'info' : 'error',
-      details: `${target.fullName}'s admin account was ${nextStatus === 'active' ? 'activated' : 'deactivated'}.`,
-    })
-  }
-
-  const deleteAdmin = (id) => {
-    if (!isSuperAdmin() || id === actorRef.current?.id) return
-    const target = store.admins.find((a) => a.id === id)
-    if (!target) return
-    setStore((prev) => ({ ...prev, admins: prev.admins.filter((a) => a.id !== id) }))
-    addAuditLog({
-      action: 'Admin Deleted',
-      reference: id,
-      status: 'error',
-      details: `Deleted ${target.role} account for ${target.fullName} (${target.email}).`,
-    })
-  }
-
-  // ---- Products ----
-  const addProduct = (product) => {
-    const newProduct = { ...product, id: `p${Date.now()}` }
-    setStore((prev) => ({ ...prev, products: [newProduct, ...prev.products] }))
-    addAuditLog({
-      action: 'Product Created',
-      reference: product.name,
-      status: 'info',
-      details: `New ${product.type} product "${product.name}" added.`,
-    })
-    return newProduct
-  }
-
-  const updateProduct = (id, updates) => {
-    setStore((prev) => ({
-      ...prev,
-      products: prev.products.map((p) => (p.id === id ? { ...p, ...updates } : p)),
-    }))
-    addAuditLog({
-      action: 'Product Updated',
-      reference: updates.name || id,
-      status: 'info',
-      details: `Product "${updates.name || id}" was updated.`,
-    })
-  }
-
-  const deleteProduct = (id) => {
-    setStore((prev) => ({ ...prev, products: prev.products.filter((p) => p.id !== id) }))
-  }
-
-  const toggleProductStatus = (id) => {
-    setStore((prev) => ({
-      ...prev,
-      products: prev.products.map((p) =>
-        p.id === id ? { ...p, status: p.status === 'active' ? 'disabled' : 'active' } : p
-      ),
-    }))
+  const deleteAdmin = async (id) => {
+    if (!isSuperAdmin() || id === actorRef.current?.id) return { success: false, error: 'You cannot delete your own account.' }
+    const result = await call(`/admin/admins/${id}/`, { method: 'DELETE' }, { audited: true })
+    if (result.success) setStore((prev) => ({ ...prev, admins: prev.admins.filter((a) => a.id !== id) }))
+    return result
   }
 
   // ---- Customers ----
-  // Newly registered customers only exist in the auth session; add them to the
-  // store so admins can see them and approvals have a record to credit.
+  // Account fields (identity, status, next of kin, balances) follow the server.
+  const EMPTY_BALANCES = { savingsBalance: 0, investmentBalance: 0, outstandingLoan: 0, totalBalance: 0 }
+
+  const mergeCustomer = (local, account) => ({
+    ...EMPTY_BALANCES,
+    ...local,
+    id: account.id,
+    fullName: account.fullName,
+    email: account.email,
+    phone: account.phone,
+    agentCode: account.agentCode || null,
+    authProvider: account.authProvider,
+    joined: account.joined,
+    // The customer's own session doesn't report status changes made by admins
+    ...(account.status && { status: account.status }),
+    nextOfKin: account.nextOfKin ?? local?.nextOfKin ?? null,
+    // Balances change only when a Super Admin approves a payment on the server
+    ...(account.savingsBalance !== undefined && {
+      savingsBalance: account.savingsBalance,
+      investmentBalance: account.investmentBalance,
+      outstandingLoan: account.outstandingLoan,
+      totalBalance: account.totalBalance,
+    }),
+  })
+
+  const sameRecord = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+
+  // Mirror the signed-in customer into the store so their portal has a record to read
   const ensureCustomer = (user) => {
     if (!user?.id) return
-    setStore((prev) =>
-      prev.customers.some((c) => c.id === user.id)
-        ? prev
-        : { ...prev, customers: [...prev.customers, user] }
-    )
+    setStore((prev) => {
+      const existing = prev.customers.find((c) => c.id === user.id)
+      const merged = mergeCustomer(existing, { ...user, status: existing?.status || 'active' })
+      if (existing && sameRecord(existing, merged)) return prev
+      return {
+        ...prev,
+        customers: existing ? prev.customers.map((c) => (c.id === user.id ? merged : c)) : [...prev.customers, merged],
+      }
+    })
   }
 
-  const suspendCustomer = (id) => {
-    const customer = store.customers.find((c) => c.id === id)
-    const nextStatus = customer?.status === 'suspended' ? 'active' : 'suspended'
-    setStore((prev) => ({
-      ...prev,
-      customers: prev.customers.map((c) => (c.id === id ? { ...c, status: nextStatus } : c)),
-    }))
-    if (customer) {
-      addAuditLog({
-        action: nextStatus === 'suspended' ? 'Customer Suspended' : 'Customer Reactivated',
-        reference: id,
-        agentCode: customer.agentCode || null,
-        status: nextStatus === 'suspended' ? 'error' : 'info',
-        details: `${customer.fullName}'s account status changed to ${nextStatus}.`,
+  // Admin portal: load every customer account
+  const refreshCustomers = async () => {
+    const result = await call('/admin/customers/')
+    if (result.success) {
+      setStore((prev) => {
+        const local = new Map(prev.customers.map((c) => [c.id, c]))
+        return { ...prev, customers: result.customers.map((c) => mergeCustomer(local.get(c.id), c)) }
       })
     }
+    return result
   }
 
-  // Profile details (e.g. next of kin) saved from the customer portal
+  const suspendCustomer = async (id) => {
+    const customer = store.customers.find((c) => c.id === id)
+    if (!customer) return { success: false, error: 'Customer not found.' }
+    const status = customer.status === 'suspended' ? 'active' : 'suspended'
+    const result = await call(`/admin/customers/${id}/`, { method: 'PATCH', body: { status } }, { audited: true })
+    if (result.success) {
+      setStore((prev) => ({
+        ...prev,
+        customers: prev.customers.map((c) => (c.id === id ? mergeCustomer(c, result.customer) : c)),
+      }))
+    }
+    return result
+  }
+
+  // Shows a profile change (e.g. next of kin) at once; the server copy is saved separately
   const updateCustomer = (id, updates) => {
     setStore((prev) => ({
       ...prev,
@@ -479,148 +386,117 @@ export function DataStoreProvider({ children }) {
     }))
   }
 
-  // ---- Bank accounts per facility (Admin and Super Admin) ----
-  const describeAccount = (a) => `${a.bankName} · ${a.accountNumber} (${a.accountName})`
-
-  const addBankAccount = (data) => {
-    if (!actorRef.current) return null
-    const account = {
-      id: `ba${Date.now()}`,
-      bankName: data.bankName.trim(),
-      accountName: data.accountName.trim(),
-      accountNumber: data.accountNumber.trim(),
-      notes: data.notes?.trim() || '',
-      status: 'active',
-      createdAt: new Date().toISOString().slice(0, 10),
-    }
-    setStore((prev) => ({ ...prev, bankAccounts: [...prev.bankAccounts, account] }))
-    addAuditLog({
-      action: 'Bank Account Added',
-      reference: account.accountNumber,
-      status: 'success',
-      details: `Added collection account ${describeAccount(account)}.`,
-    })
-    return account
+  // ---- Collection bank accounts ----
+  // Every admin can see them; only a Super Admin can change where customers pay.
+  const applyBankAccounts = (result) => {
+    if (result.success) patch({ bankAccounts: result.accounts, accountAssignments: result.assignments })
+    return result
   }
 
-  const updateBankAccount = (id, data) => {
-    if (!actorRef.current) return
-    const before = store.bankAccounts.find((a) => a.id === id)
-    if (!before) return
-    const updates = {
-      bankName: data.bankName.trim(),
-      accountName: data.accountName.trim(),
-      accountNumber: data.accountNumber.trim(),
-      notes: data.notes?.trim() || '',
-    }
-    setStore((prev) => ({ ...prev, bankAccounts: prev.bankAccounts.map((a) => (a.id === id ? { ...a, ...updates } : a)) }))
-    addAuditLog({
-      action: 'Bank Account Updated',
-      reference: updates.accountNumber,
-      status: 'info',
-      details: `Changed ${describeAccount(before)} to ${describeAccount({ ...before, ...updates })}.`,
-    })
-  }
+  const bankPayload = (data) => ({
+    bankName: data.bankName.trim(),
+    accountName: data.accountName.trim(),
+    accountNumber: data.accountNumber.trim(),
+    notes: data.notes?.trim() || '',
+  })
 
-  const toggleBankAccountStatus = (id) => {
-    if (!actorRef.current) return
+  const refreshBankAccounts = async () => applyBankAccounts(await call('/admin/bank-accounts/'))
+
+  const addBankAccount = async (data) =>
+    applyBankAccounts(await call('/admin/bank-accounts/', { method: 'POST', body: bankPayload(data) }, { audited: true }))
+
+  const updateBankAccount = async (id, data) =>
+    applyBankAccounts(await call(`/admin/bank-accounts/${id}/`, { method: 'PATCH', body: bankPayload(data) }, { audited: true }))
+
+  const toggleBankAccountStatus = async (id) => {
     const account = store.bankAccounts.find((a) => a.id === id)
-    if (!account) return
-    const nextStatus = account.status === 'active' ? 'inactive' : 'active'
-    setStore((prev) => ({ ...prev, bankAccounts: prev.bankAccounts.map((a) => (a.id === id ? { ...a, status: nextStatus } : a)) }))
-    addAuditLog({
-      action: nextStatus === 'active' ? 'Bank Account Activated' : 'Bank Account Deactivated',
-      reference: account.accountNumber,
-      status: nextStatus === 'active' ? 'info' : 'error',
-      details: `${describeAccount(account)} was ${nextStatus === 'active' ? 'activated' : 'deactivated'}.`,
-    })
+    if (!account) return { success: false, error: 'Bank account not found.' }
+    const status = account.status === 'active' ? 'inactive' : 'active'
+    return applyBankAccounts(await call(`/admin/bank-accounts/${id}/`, { method: 'PATCH', body: { status } }, { audited: true }))
   }
 
-  // Removing an account also clears its facility mappings, so those facilities fall back to the default
-  const removeBankAccount = (id) => {
-    if (!actorRef.current) return
-    const account = store.bankAccounts.find((a) => a.id === id)
-    if (!account) return
-    setStore((prev) => ({
-      ...prev,
-      bankAccounts: prev.bankAccounts.filter((a) => a.id !== id),
-      accountAssignments: Object.fromEntries(Object.entries(prev.accountAssignments).filter(([, accId]) => accId !== id)),
-    }))
-    addAuditLog({
-      action: 'Bank Account Removed',
-      reference: account.accountNumber,
-      status: 'error',
-      details: `Removed collection account ${describeAccount(account)}.`,
-    })
-  }
+  // Its facility mappings go too, so those facilities fall back to the default account
+  const removeBankAccount = async (id) =>
+    applyBankAccounts(await call(`/admin/bank-accounts/${id}/`, { method: 'DELETE' }, { audited: true }))
 
   // accountId '' clears the mapping (the facility then uses the default account)
-  const assignBankAccount = (facility, accountId, facilityName) => {
-    if (!actorRef.current) return
-    const account = store.bankAccounts.find((a) => a.id === accountId)
-    setStore((prev) => {
-      const next = { ...prev.accountAssignments }
-      if (accountId) next[facility] = accountId
-      else delete next[facility]
-      return { ...prev, accountAssignments: next }
-    })
-    addAuditLog({
-      action: 'Bank Account Assigned',
-      reference: facilityName,
-      status: 'info',
-      details: account
-        ? `${facilityName} payments now go to ${describeAccount(account)}.`
-        : `${facilityName} now uses the default collection account.`,
-    })
+  const assignBankAccount = async (facility, accountId, facilityName) =>
+    applyBankAccounts(await call(`/admin/bank-accounts/assignments/${facility}/`, {
+      method: 'PUT',
+      body: { accountId: accountId || '', facilityName },
+    }, { audited: true }))
+
+  // ---- Notifications (the signed-in customer's or admin's own, created by the server) ----
+  const refreshNotifications = async () => {
+    const result = await call('/notifications/')
+    if (result.success) patch({ notifications: result.notifications, unreadCount: result.unreadCount })
+    return result
   }
 
-  // ---- Notifications ----
+  // Marked read here straight away; the server is told in the background
   const markNotificationRead = (id) => {
-    setStore((prev) => ({
-      ...prev,
-      notifications: prev.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    }))
+    setStore((prev) => {
+      const target = prev.notifications.find((n) => n.id === id)
+      if (!target || target.read) return prev
+      return {
+        ...prev,
+        unreadCount: Math.max(0, prev.unreadCount - 1),
+        notifications: prev.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      }
+    })
+    api(`/notifications/${id}/read/`, { method: 'POST' }).catch(() => {})
   }
 
   const markAllNotificationsRead = () => {
-    setStore((prev) => ({
-      ...prev,
-      notifications: prev.notifications.map((n) => ({ ...n, read: true })),
-    }))
+    setStore((prev) => ({ ...prev, unreadCount: 0, notifications: prev.notifications.map((n) => ({ ...n, read: true })) }))
+    api('/notifications/read-all/', { method: 'POST' }).catch(() => {})
   }
 
   const value = {
     ...store,
+    setActor,
+    refreshAuditLogs,
+    refreshProducts,
+    addProduct,
+    updateProduct,
+    deleteProduct,
+    toggleProductStatus,
+    refreshTransactions,
     createTransaction,
     attachReceipt,
     recordSlipView,
     recommendPayment,
     approvePayment,
     rejectPayment,
+    refreshWithdrawals,
+    getWithdrawablePlans,
+    quoteWithdrawal,
+    requestWithdrawal,
+    cancelWithdrawal,
+    getAdminWithdrawal,
+    withdrawalAction,
+    refreshAgents,
     createAgent,
     updateAgent,
     toggleAgentStatus,
+    refreshAdmins,
     createAdmin,
     updateAdmin,
     toggleAdminStatus,
     deleteAdmin,
-    setActor,
-    addProduct,
-    updateProduct,
-    deleteProduct,
-    toggleProductStatus,
     ensureCustomer,
+    refreshCustomers,
     suspendCustomer,
     updateCustomer,
+    refreshBankAccounts,
     addBankAccount,
     updateBankAccount,
     toggleBankAccountStatus,
     removeBankAccount,
     assignBankAccount,
+    refreshNotifications,
     markNotificationRead,
     markAllNotificationsRead,
-    addAuditLog,
-    addNotification,
   }
 
   return <DataStoreContext.Provider value={value}>{children}</DataStoreContext.Provider>

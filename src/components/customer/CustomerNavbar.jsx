@@ -1,17 +1,15 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Menu, Bell, ChevronDown, LogOut, User, Settings } from 'lucide-react'
+import { Menu, ChevronDown, LogOut, User, Settings } from 'lucide-react'
+import NotificationBell from '../notifications/NotificationBell'
 import { useAuth } from '../../context/AuthContext'
-import { useDataStore } from '../../context/DataStoreContext'
 
 export default function CustomerNavbar({ onMenuClick, title }) {
   const { user, logout } = useAuth()
-  const { notifications } = useDataStore()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
   const navigate = useNavigate()
 
-  const unreadCount = notifications.filter((n) => !n.read).length
 
   useEffect(() => {
     const onClick = (e) => {
@@ -53,16 +51,7 @@ export default function CustomerNavbar({ onMenuClick, title }) {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <Link
-            to="/customer/notifications"
-            className="relative p-2.5 rounded-xl text-navy-500 hover:bg-navy-100 transition-colors"
-            aria-label="Notifications"
-          >
-            <Bell size={19} />
-            {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-slate-50" />
-            )}
-          </Link>
+          <NotificationBell basePath="/customer" />
 
           <div className="relative" ref={menuRef}>
             <button

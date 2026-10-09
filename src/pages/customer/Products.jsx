@@ -2,12 +2,13 @@ import { useState } from 'react'
 import PageHeader from '../../components/ui/PageHeader'
 import ProductCard from '../../components/customer/ProductCard'
 import EmptyState from '../../components/ui/EmptyState'
+import LoadingState from '../../components/ui/LoadingState'
 import { useDataStore } from '../../context/DataStoreContext'
 import { productTypes } from '../../data/products'
 import { Package } from 'lucide-react'
 
 export default function Products() {
-  const { products } = useDataStore()
+  const { products, productsLoaded } = useDataStore()
   const [filter, setFilter] = useState('all')
 
   const activeProducts = products.filter((p) => p.status === 'active')
@@ -39,7 +40,9 @@ export default function Products() {
         ))}
       </div>
 
-      {filtered.length === 0 ? (
+      {!productsLoaded ? (
+        <LoadingState label="Loading products..." />
+      ) : filtered.length === 0 ? (
         <EmptyState icon={Package} title="No products found" description="Try a different category filter." />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 stagger-children">

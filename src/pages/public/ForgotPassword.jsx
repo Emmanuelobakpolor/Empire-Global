@@ -4,25 +4,30 @@ import { Mail, CheckCircle2 } from 'lucide-react'
 import AuthLayout from '../../components/AuthLayout'
 import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
+import { useAuth } from '../../context/AuthContext'
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
+  const { requestPasswordReset } = useAuth()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!email) return
+    setError('')
     setLoading(true)
-    await new Promise((r) => setTimeout(r, 900))
+    const result = await requestPasswordReset(email)
     setLoading(false)
-    setSent(true)
+    if (result.success) setSent(true)
+    else setError(result.error)
   }
 
   return (
     <AuthLayout
       title="Forgot Password"
-      subtitle="Enter your email and we'll simulate sending a reset link."
+      subtitle="Enter your email and we'll send you a link to reset your password."
       footer={
         <>
           Remembered your password?{' '}
@@ -37,9 +42,9 @@ export default function ForgotPassword() {
           <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center">
             <CheckCircle2 size={28} />
           </div>
-          <h3 className="font-bold text-navy-900">Reset Link Sent</h3>
+          <h3 className="font-bold text-navy-900">Check Your Inbox</h3>
           <p className="text-sm text-navy-400">
-            We've simulated sending password reset instructions to <strong>{email}</strong>. Check your inbox.
+            If an account exists for <strong>{email}</strong>, we've sent a link to reset your password. It expires in 1 hour.
           </p>
           <Link to="/login" className="w-full mt-2">
             <Button fullWidth>Back to Login</Button>
@@ -54,6 +59,7 @@ export default function ForgotPassword() {
             placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            error={error}
             required
           />
           <Button type="submit" fullWidth loading={loading} size="lg">

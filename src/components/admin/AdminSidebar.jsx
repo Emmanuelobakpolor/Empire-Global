@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import {
+  ArrowDownToLine,
   LayoutDashboard,
   Users,
   Wallet,
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { to: '/admin/customers', label: 'Customers', icon: Users },
   { to: '/admin/agents', label: 'Agents', icon: BadgeCheck },
   { to: '/admin/payments', label: 'Payments', icon: Wallet },
+  { to: '/admin/withdrawals', label: 'Withdrawals', icon: ArrowDownToLine },
   { to: '/admin/transactions', label: 'Transactions', icon: Receipt },
   { to: '/admin/products', label: 'Products', icon: Package },
   { to: '/admin/reports', label: 'Reports', icon: BarChart3 },

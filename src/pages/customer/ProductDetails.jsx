@@ -3,6 +3,7 @@ import { ChevronLeft, CheckCircle2, ArrowRight, ClipboardCheck, Info } from 'luc
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import EmptyState from '../../components/ui/EmptyState'
+import LoadingState from '../../components/ui/LoadingState'
 import { PRODUCT_ICONS, PRODUCT_COLORS } from '../../components/customer/ProductCard'
 import { useDataStore } from '../../context/DataStoreContext'
 import { formatCurrency } from '../../utils/formatCurrency'
@@ -10,8 +11,10 @@ import { formatCurrency } from '../../utils/formatCurrency'
 export default function ProductDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { products } = useDataStore()
+  const { products, productsLoaded } = useDataStore()
   const product = products.find((p) => p.id === id)
+
+  if (!product && !productsLoaded) return <LoadingState label="Loading product..." />
 
   if (!product) {
     return <EmptyState title="Product not found" description="This product may have been removed." action={<Link to="/customer/products"><Button>Back to Products</Button></Link>} />

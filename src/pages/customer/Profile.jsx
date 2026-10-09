@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User, Mail, Phone, Lock, LogOut, ShieldCheck, Calendar, BadgeCheck } from 'lucide-react'
+import { User, Mail, Phone, Lock, LogOut, ShieldCheck, Calendar, BadgeCheck, Copy, Check } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
@@ -8,22 +8,38 @@ import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import Modal from '../../components/ui/Modal'
+import ChangeEmailModal from '../../components/customer/ChangeEmailModal'
 import { useAuth } from '../../context/AuthContext'
 import { useDataStore } from '../../context/DataStoreContext'
 import { NextOfKinForm, EMPTY_NEXT_OF_KIN, nextOfKinErrors } from '../../components/customer/ApplicationForms'
 import { useToast } from '../../context/ToastContext'
 import { formatDate } from '../../utils/formatDate'
+import { copyText } from '../../utils/clipboard'
 
 export default function Profile() {
-  const { user, updateProfile, logout } = useAuth()
+  const { user, updateProfile, changePassword, logout } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
 
-  const [form, setForm] = useState({ fullName: user?.fullName || '', email: user?.email || '', phone: user?.phone || '' })
+  const [form, setForm] = useState({ fullName: user?.fullName || '', phone: user?.phone || '' })
+  const [emailOpen, setEmailOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' })
+  const [passwordErrors, setPasswordErrors] = useState({})
+  const [copied, setCopied] = useState(false)
+
+  const copyCustomerId = async () => {
+    if (!(await copyText(user.id))) {
+      showToast("Couldn't copy. Please copy the ID manually.", 'error')
+      return
+    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  const [changingPassword, setChangingPassword] = useState(false)
 
   const { customers, updateCustomer } = useDataStore()
   const savedNextOfKin = customers.find((c) => c.id === user?.id)?.nextOfKin || user?.nextOfKin
@@ -34,10 +50,10 @@ export default function Profile() {
   const handleSave = async (e) => {
     e.preventDefault()
     setSaving(true)
-    await new Promise((r) => setTimeout(r, 700))
-    updateProfile(form)
+    const result = await updateProfile({ fullName: form.fullName, phone: form.phone })
     setSaving(false)
-    showToast('Profile updated successfully.', 'success')
+    if (result.success) showToast('Profile updated successfully.', 'success')
+    else showToast(result.error, 'error')
   }
 
   const handleSaveNextOfKin = async (e) => {
@@ -46,21 +62,42 @@ export default function Profile() {
     setNokErrors(errs)
     if (Object.keys(errs).length) return
     setSavingNok(true)
-    await new Promise((r) => setTimeout(r, 600))
-    updateCustomer(user.id, { nextOfKin })
-    updateProfile({ nextOfKin })
+    const result = await updateProfile({ nextOfKin })
     setSavingNok(false)
+    if (!result.success) {
+      showToast(result.error, 'error')
+      return
+    }
+    updateCustomer(user.id, { nextOfKin })
     showToast('Next of kin saved.', 'success')
   }
 
-  const handleChangePassword = (e) => {
-    e.preventDefault()
-    if (!passwordForm.next || passwordForm.next !== passwordForm.confirm) {
-      showToast('Passwords do not match.', 'error')
-      return
-    }
+  const closePasswordModal = () => {
     setPasswordOpen(false)
     setPasswordForm({ current: '', next: '', confirm: '' })
+    setPasswordErrors({})
+  }
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault()
+    if (!passwordForm.current) {
+      setPasswordErrors({ current: 'Enter your current password.' })
+      return
+    }
+    if (!passwordForm.next || passwordForm.next !== passwordForm.confirm) {
+      setPasswordErrors({ confirm: 'Passwords do not match.' })
+      return
+    }
+    setChangingPassword(true)
+    const result = await changePassword(passwordForm.current, passwordForm.next)
+    setChangingPassword(false)
+    if (!result.success) {
+      const { currentPassword, newPassword } = result.fieldErrors
+      if (currentPassword || newPassword) setPasswordErrors({ current: currentPassword, next: newPassword })
+      else showToast(result.error, 'error')
+      return
+    }
+    closePasswordModal()
     showToast('Password changed successfully.', 'success')
   }
 
@@ -79,7 +116,10 @@ export default function Profile() {
             <h3 className="text-sm font-bold text-navy-800 mb-5">Personal Information</h3>
             <form onSubmit={handleSave} className="flex flex-col gap-4">
               <Input label="Full Name" icon={User} value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
-              <Input label="Email" icon={Mail} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              <div className="flex items-end gap-2">
+                <Input label="Email" icon={Mail} type="email" value={user?.email || ''} readOnly disabled containerClassName="flex-1" />
+                <Button variant="outline" onClick={() => setEmailOpen(true)} className="shrink-0">Change</Button>
+              </div>
               <Input label="Phone Number" icon={Phone} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
               <div>
                 <Button type="submit" loading={saving}>Save Changes</Button>
@@ -148,29 +188,28 @@ export default function Profile() {
               <p className="text-xs text-navy-400 mt-0.5">{user?.email}</p>
             </div>
 
-            <div className="flex flex-col divide-y divide-navy-50 border-t border-navy-50 px-2 pb-2">
-              <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-                <span className="text-navy-400 flex items-center gap-2.5 text-xs font-medium whitespace-nowrap">
-                  <span className="w-7 h-7 rounded-lg bg-navy-50 text-navy-500 flex items-center justify-center shrink-0"><BadgeCheck size={14} /></span>
-                  Customer ID
+            <dl className="flex flex-col divide-y divide-navy-50 border-t border-navy-50">
+              <DetailRow icon={BadgeCheck} label="Customer ID">
+                <span className="flex items-center gap-1.5">
+                  <span className="font-mono font-semibold text-navy-900 text-sm tracking-wide">{user?.id}</span>
+                  <button
+                    type="button"
+                    onClick={copyCustomerId}
+                    className="p-1 rounded-md text-navy-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                    aria-label="Copy customer ID"
+                    title="Copy customer ID"
+                  >
+                    {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                  </button>
                 </span>
-                <span className="font-semibold text-navy-900 text-sm tabular-nums">{user?.id}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-                <span className="text-navy-400 flex items-center gap-2.5 text-xs font-medium whitespace-nowrap">
-                  <span className="w-7 h-7 rounded-lg bg-navy-50 text-navy-500 flex items-center justify-center shrink-0"><ShieldCheck size={14} /></span>
-                  Account Status
-                </span>
+              </DetailRow>
+              <DetailRow icon={ShieldCheck} label="Account Status">
                 <Badge status={user?.status || 'active'}>{user?.status || 'active'}</Badge>
-              </div>
-              <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-                <span className="text-navy-400 flex items-center gap-2.5 text-xs font-medium whitespace-nowrap">
-                  <span className="w-7 h-7 rounded-lg bg-navy-50 text-navy-500 flex items-center justify-center shrink-0"><Calendar size={14} /></span>
-                  Member Since
-                </span>
-                <span className="font-semibold text-navy-900 text-sm text-right">{formatDate(user?.joined)}</span>
-              </div>
-            </div>
+              </DetailRow>
+              <DetailRow icon={Calendar} label="Member Since">
+                <span className="font-semibold text-navy-900 text-sm">{formatDate(user?.joined)}</span>
+              </DetailRow>
+            </dl>
           </Card>
         </div>
       </div>
@@ -184,14 +223,31 @@ export default function Profile() {
         confirmLabel="Logout"
       />
 
-      <Modal open={passwordOpen} onClose={() => setPasswordOpen(false)} title="Change Password">
+      <ChangeEmailModal open={emailOpen} onClose={() => setEmailOpen(false)} />
+
+      <Modal open={passwordOpen} onClose={closePasswordModal} title="Change Password">
         <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
-          <Input label="Current Password" type="password" value={passwordForm.current} onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })} />
-          <Input label="New Password" type="password" value={passwordForm.next} onChange={(e) => setPasswordForm({ ...passwordForm, next: e.target.value })} />
-          <Input label="Confirm New Password" type="password" value={passwordForm.confirm} onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })} />
-          <Button type="submit" fullWidth>Update Password</Button>
+          <Input label="Current Password" type="password" autoComplete="current-password" value={passwordForm.current} error={passwordErrors.current} onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })} />
+          <Input label="New Password" type="password" autoComplete="new-password" value={passwordForm.next} error={passwordErrors.next} hint="At least 8 characters. Avoid common or all-number passwords." onChange={(e) => setPasswordForm({ ...passwordForm, next: e.target.value })} />
+          <Input label="Confirm New Password" type="password" autoComplete="new-password" value={passwordForm.confirm} error={passwordErrors.confirm} onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })} />
+          <Button type="submit" fullWidth loading={changingPassword}>Update Password</Button>
         </form>
       </Modal>
+    </div>
+  )
+}
+
+// One line of the account summary: icon, then the label above its value
+function DetailRow({ icon: Icon, label, children }) {
+  return (
+    <div className="flex items-center gap-3 px-5 py-3.5">
+      <span className="w-9 h-9 rounded-xl bg-navy-50 text-navy-500 flex items-center justify-center shrink-0">
+        <Icon size={16} />
+      </span>
+      <div className="min-w-0">
+        <dt className="text-[11px] font-medium uppercase tracking-wider text-navy-400">{label}</dt>
+        <dd className="mt-0.5">{children}</dd>
+      </div>
     </div>
   )
 }

@@ -6,22 +6,27 @@ import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import FileUpload from '../../components/ui/FileUpload'
 import EmptyState from '../../components/ui/EmptyState'
+import LoadingState from '../../components/ui/LoadingState'
+import PaymentAccountCard from '../../components/customer/PaymentAccountCard'
 import { useDataStore } from '../../context/DataStoreContext'
 import { useToast } from '../../context/ToastContext'
 import { formatCurrency } from '../../utils/formatCurrency'
-import { resolveBankAccount } from '../../data/bankAccounts'
+
+const MAX_RECEIPT_BYTES = 5 * 1024 * 1024
 
 export default function UploadReceipt() {
   const [searchParams] = useSearchParams()
   const ref = searchParams.get('ref')
   const navigate = useNavigate()
-  const { transactions, attachReceipt, bankAccounts, accountAssignments } = useDataStore()
+  const { transactions, transactionsLoaded, attachReceipt } = useDataStore()
   const { showToast } = useToast()
 
   const transaction = transactions.find((t) => t.reference === ref)
   const [file, setFile] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+
+  if (!transaction && !transactionsLoaded) return <LoadingState label="Loading transaction..." />
 
   if (!transaction) {
     return (
@@ -33,15 +38,23 @@ export default function UploadReceipt() {
     )
   }
 
+  const selectFile = (selected) => {
+    if (selected && selected.size > MAX_RECEIPT_BYTES) {
+      showToast('Receipts must be 5 MB or smaller.', 'error')
+      return
+    }
+    setFile(selected)
+  }
+
   const handleSubmit = async () => {
     if (!file) return
     setSubmitting(true)
-    await new Promise((r) => setTimeout(r, 900))
-    // Keep a copy of the account the customer was told to pay into, for verification
-    const account = resolveBankAccount(bankAccounts, accountAssignments, transaction.productType)
-    const paidTo = account && { bankName: account.bankName, accountName: account.accountName, accountNumber: account.accountNumber }
-    attachReceipt(transaction.id, { fileName: file.name, uploadedAt: new Date().toISOString(), paidTo })
+    const result = await attachReceipt(transaction.reference, file)
     setSubmitting(false)
+    if (!result.success) {
+      showToast(result.fieldErrors.file || result.error, 'error')
+      return
+    }
     setSubmitted(true)
     showToast('Receipt submitted successfully.', 'success')
   }
@@ -73,6 +86,9 @@ export default function UploadReceipt() {
     <div className="max-w-2xl">
       <PageHeader title="Upload Payment Receipt" subtitle="Attach proof of your payment so we can verify it." />
 
+      {/* Still needed here: the dashboard links straight to this page for unpaid plans */}
+      {!['approved', 'rejected'].includes(transaction.status) && <PaymentAccountCard transaction={transaction} />}
+
       <Card className="mb-6">
         <div className="flex items-center justify-between text-sm mb-5 pb-5 border-b border-navy-50">
           <div>
@@ -85,7 +101,13 @@ export default function UploadReceipt() {
           </div>
         </div>
 
-        <FileUpload file={file} onFileSelect={setFile} onRemove={() => setFile(null)} />
+        <FileUpload
+          file={file}
+          onFileSelect={selectFile}
+          onRemove={() => setFile(null)}
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+          hint="JPG, PNG, WebP or PDF, up to 5 MB"
+        />
       </Card>
 
       <Button size="lg" fullWidth disabled={!file} loading={submitting} onClick={handleSubmit}>

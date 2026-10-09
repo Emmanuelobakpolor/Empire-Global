@@ -1,59 +1,85 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useMemo } from 'react'
 import { useDataStore } from './DataStoreContext'
-import { ROLES } from '../data/admins'
+import { useSession } from './SessionContext'
+import { ROLES, roleLabel } from '../data/admins'
+import { api, failure } from '../utils/api'
 
 const AdminAuthContext = createContext(null)
-const STORAGE_KEY = 'empire_admin_session_id'
-
-export const DEMO_ADMIN_EMAIL = 'admin@empireglobal.com'
-export const DEMO_ADMIN_PASSWORD = 'admin123'
-export const DEMO_REGULAR_ADMIN_EMAIL = 'michael@empireglobal.com'
 
 export function AdminAuthProvider({ children }) {
-  const { admins, setActor } = useDataStore()
-  const [adminId, setAdminId] = useState(() => {
-    try {
-      return localStorage.getItem(STORAGE_KEY)
-    } catch {
-      return null
-    }
-  })
-  const loading = false
+  const { setActor } = useDataStore()
+  const { account, setAccount, loading, signOut } = useSession()
 
-  // Always read the live account, so a deactivated or deleted admin loses access immediately
-  const found = admins.find((a) => a.id === adminId)
-  const admin = found && found.status === 'active' ? found : null
+  // Deactivated admins are signed out by the backend, which also refuses their login
+  const signedIn = roleLabel(account?.role) ? account : null
+  const admin = useMemo(() => signedIn && { ...signedIn, role: roleLabel(signedIn.role) }, [signedIn])
 
   // Set during render (it's only a ref) so page effects, which run before this
   // provider's effects, already see who is acting.
   setActor(admin)
 
-  const persist = (id) => {
-    setAdminId(id)
-    if (id) localStorage.setItem(STORAGE_KEY, id)
-    else localStorage.removeItem(STORAGE_KEY)
-  }
-
+  // Step 1: email and password. Admins then confirm with an emailed code (step 2),
+  // unless the backend has two-factor sign-in turned off.
   const login = async (email, password) => {
-    await new Promise((r) => setTimeout(r, 600))
-    const account = admins.find((a) => a.email.toLowerCase() === email?.trim().toLowerCase())
-    if (!account || account.password !== password) {
-      return { success: false, error: 'Invalid admin email or password.' }
+    try {
+      const data = await api('/admin/auth/login/', { method: 'POST', body: { email: email.trim(), password } })
+      if (data.twoFactorRequired) {
+        return { success: true, twoFactorRequired: true, email: data.email, resendIn: data.resendIn, otpLength: data.otpLength }
+      }
+      setAccount(data.user)
+      return { success: true, user: data.user }
+    } catch (err) {
+      return failure(err)
     }
-    if (account.status !== 'active') {
-      return { success: false, error: 'This admin account has been deactivated. Contact a Super Admin.' }
-    }
-    persist(account.id)
-    setActor(account)
-    return { success: true }
   }
 
-  const logout = () => persist(null)
+  const verifyLoginCode = async (code) => {
+    try {
+      const data = await api('/admin/auth/verify-code/', { method: 'POST', body: { code } })
+      setAccount(data.user)
+      return { success: true, user: data.user }
+    } catch (err) {
+      return { ...failure(err), expired: err.code === 'two_factor_expired' }
+    }
+  }
+
+  const resendLoginCode = async () => {
+    try {
+      const data = await api('/admin/auth/resend-code/', { method: 'POST' })
+      return { success: true, resendIn: data.resendIn }
+    } catch (err) {
+      return { ...failure(err), retryAfter: err.data?.retryAfter, expired: err.code === 'two_factor_expired' }
+    }
+  }
+
+  const logout = () => signOut()
+
+  // The signed-in admin's own name (email and role are changed by a Super Admin)
+  const updateProfile = async ({ fullName }) => {
+    try {
+      const data = await api('/auth/me/', { method: 'PATCH', body: { fullName } })
+      setAccount(data.user)
+      return { success: true }
+    } catch (err) {
+      return failure(err)
+    }
+  }
+
+  const changePassword = async (currentPassword, newPassword) => {
+    try {
+      // Also clears mustChangePassword when an admin replaces a temporary password
+      const data = await api('/auth/change-password/', { method: 'POST', body: { currentPassword, newPassword } })
+      setAccount(data.user)
+      return { success: true }
+    } catch (err) {
+      return failure(err)
+    }
+  }
 
   const isSuperAdmin = admin?.role === ROLES.SUPER_ADMIN
 
   return (
-    <AdminAuthContext.Provider value={{ admin, loading, isAuthenticated: !!admin, isSuperAdmin, login, logout }}>
+    <AdminAuthContext.Provider value={{ admin, loading, isAuthenticated: !!admin, isSuperAdmin, login, verifyLoginCode, resendLoginCode, logout, updateProfile, changePassword }}>
       {children}
     </AdminAuthContext.Provider>
   )

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Mail, Lock, Info } from 'lucide-react'
+import { Mail, Lock } from 'lucide-react'
 import AuthLayout from '../../components/AuthLayout'
 import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
@@ -9,8 +9,8 @@ import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 
 export default function Login() {
-  const [email, setEmail] = useState('customer@example.com')
-  const [password, setPassword] = useState('password123')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
@@ -31,6 +31,9 @@ export default function Login() {
     if (result.success) {
       showToast('Welcome back! You have logged in successfully.', 'success')
       navigate('/customer/dashboard')
+    } else if (result.needsVerification) {
+      showToast(result.error, 'info')
+      navigate('/verify-email')
     } else {
       setError(result.error)
     }
@@ -40,7 +43,10 @@ export default function Login() {
     setGoogleLoading(true)
     const result = await continueWithGoogle({ intent: 'login' })
     setGoogleLoading(false)
-    if (!result.success) return
+    if (!result.success) {
+      showToast(result.error, 'error')
+      return
+    }
     if (result.isNewUser) {
       navigate('/complete-profile', { state: { googleProfile: result.googleProfile } })
     } else {
@@ -62,11 +68,6 @@ export default function Login() {
         </>
       }
     >
-      <div className="flex items-start gap-2 bg-emerald-50 text-emerald-700 text-xs rounded-xl px-3.5 py-2.5 mb-6">
-        <Info size={15} className="mt-0.5 shrink-0" />
-        <p>Demo login: <strong>customer@example.com</strong> / <strong>password123</strong></p>
-      </div>
-
       <GoogleAuthButton onClick={handleGoogle} loading={googleLoading} />
       <AuthDivider>or login with email</AuthDivider>
 

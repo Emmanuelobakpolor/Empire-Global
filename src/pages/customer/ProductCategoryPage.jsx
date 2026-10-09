@@ -5,6 +5,7 @@ import StatCard from '../../components/ui/StatCard'
 import ProductCard from '../../components/customer/ProductCard'
 import TransactionTable from '../../components/customer/TransactionTable'
 import EmptyState from '../../components/ui/EmptyState'
+import LoadingState from '../../components/ui/LoadingState'
 import { useAuth } from '../../context/AuthContext'
 import { useDataStore } from '../../context/DataStoreContext'
 import { useCustomerAccount } from '../../hooks/useCustomerAccount'
@@ -12,7 +13,7 @@ import { formatCurrency } from '../../utils/formatCurrency'
 
 export default function ProductCategoryPage({ type, title, subtitle, icon: Icon, balanceKey }) {
   const { user } = useAuth()
-  const { products, transactions } = useDataStore()
+  const { products, productsLoaded, transactions } = useDataStore()
 
   const categoryProducts = products.filter((p) => p.type === type && p.status === 'active')
   const categoryTransactions = transactions.filter((t) => t.customerId === user?.id && t.productType === type && t.status !== 'draft')
@@ -32,7 +33,9 @@ export default function ProductCategoryPage({ type, title, subtitle, icon: Icon,
       )}
 
       <h3 className="text-sm font-bold text-navy-800 mb-4">Available Plans</h3>
-      {categoryProducts.length === 0 ? (
+      {!productsLoaded ? (
+        <LoadingState label="Loading products..." />
+      ) : categoryProducts.length === 0 ? (
         <EmptyState title={`No ${title.toLowerCase()} products available`} />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8 stagger-children">

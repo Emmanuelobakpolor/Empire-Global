@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { UploadCloud, CheckCircle2, FileText, X, User, Phone, MapPin, Hash } from 'lucide-react'
 import Input from '../ui/Input'
 import Select from '../ui/Select'
@@ -60,11 +60,23 @@ export function nextOfKinErrors(n) {
   return errs
 }
 
-// Only the file's name and type are kept: there is no backend to upload to yet
-const toDocument = (file) => file && { fileName: file.name, size: file.size, uploadedAt: new Date().toISOString() }
+// The File itself is kept so it can be uploaded with the application; the rest is for display
+const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024
+const toDocument = (file) => file && { fileName: file.name, size: file.size, uploadedAt: new Date().toISOString(), file }
 
 function UploadRow({ label, hint, value, onChange, error }) {
   const inputRef = useRef(null)
+  const [tooBig, setTooBig] = useState(false)
+  const pick = (file) => {
+    if (file && file.size > MAX_DOCUMENT_BYTES) {
+      setTooBig(true)
+      if (inputRef.current) inputRef.current.value = ''
+      return
+    }
+    setTooBig(false)
+    onChange(toDocument(file))
+  }
+  error = error || (tooBig && 'Files must be 5 MB or smaller.')
   return (
     <div className={`rounded-xl border px-4 py-3 flex items-center gap-3 ${error ? 'border-red-300' : value ? 'border-emerald-200 bg-emerald-50/40' : 'border-navy-100'}`}>
       <span className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${value ? 'bg-emerald-100 text-emerald-600' : 'bg-navy-50 text-navy-400'}`}>
@@ -72,7 +84,7 @@ function UploadRow({ label, hint, value, onChange, error }) {
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-navy-800">{label}<span className="text-red-500 ml-0.5">*</span></p>
-        <p className="text-xs text-navy-400 truncate">{value ? value.fileName : hint || 'JPG, PNG or PDF'}</p>
+        <p className="text-xs text-navy-400 truncate">{value ? value.fileName : hint || 'JPG, PNG, WebP or PDF, up to 5 MB'}</p>
         {error && <p className="text-xs text-red-500 mt-0.5">{error}</p>}
       </div>
       {value ? (
@@ -96,7 +108,7 @@ function UploadRow({ label, hint, value, onChange, error }) {
           <UploadCloud size={14} /> Upload
         </button>
       )}
-      <input ref={inputRef} type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => onChange(toDocument(e.target.files?.[0]))} />
+      <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
     </div>
   )
 }
@@ -193,13 +205,21 @@ export function DetailList({ rows }) {
   )
 }
 
+// A stored document opens from the API (only for its owner and admins); before upload it's just a name
+const fileValue = (doc) =>
+  doc && (doc.url ? (
+    <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:text-emerald-700 hover:underline">
+      {doc.fileName}
+    </a>
+  ) : doc.fileName)
+
 export const guarantorRows = (g) => [
   { label: 'Full Name', value: g.fullName },
   { label: 'Phone', value: g.phone },
   { label: 'Address', value: g.address },
   { label: 'Relationship', value: g.relationship },
   { label: 'ID', value: g.idType && `${g.idType} · ${g.idNumber}` },
-  { label: 'ID Document', value: g.idDocument?.fileName },
+  { label: 'ID Document', value: fileValue(g.idDocument) },
 ]
 
 export const nextOfKinRows = (n) => [
@@ -212,7 +232,7 @@ export const nextOfKinRows = (n) => [
 export const documentRows = (docs) =>
   Object.entries(docs || {})
     .filter(([, d]) => d)
-    .map(([key, d]) => ({ label: d.label || REQUIRED_DOCUMENTS.find((r) => r.key === key)?.label || key, value: d.fileName }))
+    .map(([key, d]) => ({ label: d.label || REQUIRED_DOCUMENTS.find((r) => r.key === key)?.label || key, value: fileValue(d) }))
 
 export const itemRows = (item) => [
   { label: 'Item Type', value: item.category },

@@ -17,6 +17,7 @@ export default function AdminProducts() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   const openAdd = () => {
     setEditingProduct(null)
@@ -28,21 +29,31 @@ export default function AdminProducts() {
     setModalOpen(true)
   }
 
-  const handleSave = (data) => {
-    if (editingProduct) {
-      updateProduct(editingProduct.id, data)
-      showToast('Product updated successfully.', 'success')
-    } else {
-      addProduct(data)
-      showToast('Product added successfully.', 'success')
+  // Returns the result so the form can show the server's field errors
+  const handleSave = async (data) => {
+    const result = editingProduct ? await updateProduct(editingProduct.id, data) : await addProduct(data)
+    if (result.success) {
+      showToast(editingProduct ? 'Product updated successfully.' : 'Product added successfully.', 'success')
+      setModalOpen(false)
+    } else if (!Object.keys(result.fieldErrors).length) {
+      showToast(result.error, 'error')
     }
-    setModalOpen(false)
+    return result
   }
 
-  const handleDelete = () => {
-    deleteProduct(deleteTarget.id)
-    showToast('Product deleted.', 'success')
+  const handleDelete = async () => {
+    setDeleting(true)
+    const result = await deleteProduct(deleteTarget.id)
+    setDeleting(false)
+    // Products customers have used can only be disabled
+    if (result.success) showToast('Product deleted.', 'success')
+    else showToast(result.error, 'error')
     setDeleteTarget(null)
+  }
+
+  const handleToggle = async (id) => {
+    const result = await toggleProductStatus(id)
+    if (!result.success) showToast(result.error, 'error')
   }
 
   const typeLabel = (type) => productTypes.find((t) => t.value === type)?.label || type
@@ -72,7 +83,7 @@ export default function AdminProducts() {
                   <Pencil size={16} />
                 </button>
                 <button
-                  onClick={() => toggleProductStatus(p.id)}
+                  onClick={() => handleToggle(p.id)}
                   className={`p-1.5 rounded-lg hover:bg-navy-50 ${p.status === 'active' ? 'text-amber-500' : 'text-emerald-500'}`}
                   title={p.status === 'active' ? 'Disable' : 'Enable'}
                 >
@@ -101,6 +112,7 @@ export default function AdminProducts() {
         title="Delete this product?"
         description={`"${deleteTarget?.name}" will be permanently removed from the product list.`}
         confirmLabel="Delete"
+        loading={deleting}
       />
     </div>
   )

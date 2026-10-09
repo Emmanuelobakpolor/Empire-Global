@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { PiggyBank, TrendingUp, Landmark, ShoppingBag, Receipt, ArrowRight, ArrowUpRight, Clock, Sparkles, CalendarClock } from 'lucide-react'
+import { PiggyBank, TrendingUp, Landmark, ShoppingBag, Receipt, ArrowRight, ArrowUpRight, Clock, Sparkles, CalendarClock, ArrowDownToLine } from 'lucide-react'
 import StatCard from '../../components/ui/StatCard'
 import Card from '../../components/ui/Card'
 import CountUp from '../../components/ui/CountUp'
@@ -11,19 +11,15 @@ import Badge from '../../components/ui/Badge'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatDate } from '../../utils/formatDate'
 import { planPeriod, periodStatus } from '../../utils/planPeriod'
+import { productTypes } from '../../data/products'
 
 const QUICK_ACTIONS = [
   { to: '/customer/savings', label: 'Start Saving', icon: PiggyBank },
   { to: '/customer/investments', label: 'Invest', icon: TrendingUp },
   { to: '/customer/loans', label: 'Apply for Loan', icon: Landmark },
   { to: '/customer/hire-purchase', label: 'Hire Purchase', icon: ShoppingBag },
+  { to: '/customer/withdrawals', label: 'Withdraw', icon: ArrowDownToLine },
   { to: '/customer/transactions', label: 'Transactions', icon: Receipt },
-]
-
-const FEATURED_PRODUCTS = [
-  { name: 'Quarterly Collection (QC)', tag: 'Thrift', desc: 'Save daily or weekly, collected every quarter, and earn 2.5% interest on your savings.' },
-  { name: 'One-Year Lump-Sum Investment', tag: 'Investment', desc: 'Invest a lump sum for 12 months and earn 18% interest on the invested amount.' },
-  { name: 'Hire-Purchase: Electronics', tag: 'Hire-Purchase', desc: 'Get phones, laptops and home appliances now, and pay in weekly or monthly instalments.' },
 ]
 
 function greeting() {
@@ -41,6 +37,15 @@ export default function Dashboard() {
   const allMine = transactions.filter((t) => t.customerId === user?.id)
   const myTransactions = allMine.slice(0, 5)
   const pendingApplications = allMine.filter((t) => ['draft', 'pending', 'processing'].includes(t.status))
+
+  // Savings and investments approved this month (what actually moved the total balance)
+  const thisMonth = new Date().toISOString().slice(0, 7)
+  const creditedThisMonth = allMine
+    .filter((t) => t.status === 'approved' && ['savings', 'thrift', 'investment'].includes(t.productType) && t.date?.startsWith(thisMonth))
+    .reduce((sum, t) => sum + t.amount, 0)
+
+  // A few live products to explore, from the catalogue
+  const featuredProducts = products.filter((p) => p.status === 'active').slice(0, 3)
 
   // Plans ending in the next 30 days, plus ones that ended in the last 30 so a lapsed plan isn't missed
   const endingSoon = allMine
@@ -77,9 +82,11 @@ export default function Dashboard() {
               <div className="mt-1 text-3xl sm:text-4xl font-extrabold tracking-tight">
                 <CountUp value={totalBalance} duration={1400} />
               </div>
-              <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-400/15 text-emerald-300 text-xs font-semibold px-2.5 py-1 ring-1 ring-inset ring-emerald-400/25">
-                <ArrowUpRight size={13} /> 4.2% vs last month
-              </span>
+              {creditedThisMonth > 0 && (
+                <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-400/15 text-emerald-300 text-xs font-semibold px-2.5 py-1 ring-1 ring-inset ring-emerald-400/25">
+                  <ArrowUpRight size={13} /> {formatCurrency(creditedThisMonth)} credited this month
+                </span>
+              )}
             </div>
   
             {totalBalance > 0 && (
@@ -107,14 +114,14 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 stagger-children">
-        <StatCard label="Savings Balance" value={<CountUp value={savings} />} icon={PiggyBank} delta={2.1} tone="emerald" />
-        <StatCard label="Investments" value={<CountUp value={investments} />} icon={TrendingUp} delta={12.5} tone="emerald" />
-        <StatCard label="Outstanding Loan" value={<CountUp value={account?.outstandingLoan || 0} />} icon={Landmark} delta={-8.4} tone="amber" />
+        <StatCard label="Savings Balance" value={<CountUp value={savings} />} icon={PiggyBank} tone="emerald" />
+        <StatCard label="Investments" value={<CountUp value={investments} />} icon={TrendingUp} tone="emerald" />
+        <StatCard label="Outstanding Loan" value={<CountUp value={account?.outstandingLoan || 0} />} icon={Landmark} tone="amber" />
       </div>
 
       <Card className="mb-6 animate-rise-in">
         <h3 className="text-sm font-bold text-navy-800 mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 stagger-pop">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 stagger-pop">
           {QUICK_ACTIONS.map((action) => (
             <Link
               key={action.to}
@@ -222,17 +229,20 @@ export default function Dashboard() {
         <div>
           <h3 className="text-sm font-bold text-navy-800 mb-4">Available Products</h3>
           <Card className="!p-0 divide-y divide-navy-50 overflow-hidden stagger-children">
-            {FEATURED_PRODUCTS.map((p) => (
+            {featuredProducts.length === 0 && (
+              <p className="p-4 text-xs text-navy-400">No products are available yet.</p>
+            )}
+            {featuredProducts.map((p) => (
               <Link
-                key={p.name}
-                to="/customer/products"
+                key={p.id}
+                to={`/customer/products/${p.id}`}
                 className="group block p-4 transition-colors duration-300 hover:bg-emerald-50/40"
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <p className="text-sm font-bold text-navy-900">{p.name}</p>
-                  <span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full uppercase">{p.tag}</span>
+                  <span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full uppercase shrink-0">{productTypes.find((t) => t.value === p.type)?.label || p.type}</span>
                 </div>
-                <p className="text-xs text-navy-400 leading-relaxed">{p.desc}</p>
+                <p className="text-xs text-navy-400 leading-relaxed line-clamp-2">{p.description}</p>
                 <span className="text-xs font-semibold text-emerald-600 group-hover:text-emerald-700 inline-flex items-center gap-1 mt-2">
                   View Details <ArrowRight size={12} className="transition-transform duration-300 group-hover:translate-x-1" />
                 </span>

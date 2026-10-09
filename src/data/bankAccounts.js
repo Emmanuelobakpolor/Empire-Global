@@ -1,33 +1,7 @@
 import { productTypes } from './products'
 
-// Collection accounts customers pay into. Each facility (product type) is mapped to
-// one account in `accountAssignments`; facilities without a mapping use `default`.
-export const initialBankAccounts = [
-  {
-    id: 'ba1',
-    bankName: 'Empire Global Bank',
-    accountName: 'EMPIRE GLOBAL LTD',
-    accountNumber: '1234567890',
-    notes: 'Main collection account.',
-    status: 'active',
-    createdAt: '2024-01-10',
-  },
-  {
-    id: 'ba2',
-    bankName: 'Zenith Bank',
-    accountName: 'EMPIRE GLOBAL LTD - HIRE PURCHASE',
-    accountNumber: '1012345678',
-    notes: 'Use transaction reference as narration.',
-    status: 'active',
-    createdAt: '2025-03-02',
-  },
-]
-
-export const initialAccountAssignments = {
-  default: 'ba1',
-  'hire-purchase': 'ba2',
-}
-
+// Collection accounts live on the backend (GET /api/admin/bank-accounts/). Each facility
+// (product type) maps to one account; facilities without a mapping use `default`.
 export const FACILITIES = [{ value: 'default', label: 'Default (all other facilities)' }, ...productTypes]
 
 export function facilityLabel(value) {

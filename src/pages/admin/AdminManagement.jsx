@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Search, UserPlus, Pencil, Trash2, Power, User, Mail, Lock, ShieldCheck } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import Input from '../../components/ui/Input'
@@ -8,6 +8,7 @@ import Modal from '../../components/ui/Modal'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import Table, { Tr, Td } from '../../components/ui/Table'
 import Badge from '../../components/ui/Badge'
+import LoadingState from '../../components/ui/LoadingState'
 import { useDataStore } from '../../context/DataStoreContext'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useToast } from '../../context/ToastContext'
@@ -22,7 +23,7 @@ const ROLE_OPTIONS = [
 const EMPTY_FORM = { fullName: '', email: '', role: ROLES.ADMIN, password: '' }
 
 export default function AdminManagement() {
-  const { admins, createAdmin, updateAdmin, toggleAdminStatus, deleteAdmin } = useDataStore()
+  const { admins, refreshAdmins, createAdmin, updateAdmin, toggleAdminStatus, deleteAdmin } = useDataStore()
   const { admin: currentAdmin } = useAdminAuth()
   const { showToast } = useToast()
 
@@ -33,6 +34,15 @@ export default function AdminManagement() {
   const [errors, setErrors] = useState({})
   const [statusTarget, setStatusTarget] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    refreshAdmins().then((result) => {
+      if (!result.success) showToast(result.error, 'error')
+      setLoading(false)
+    })
+  }, [])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -56,33 +66,43 @@ export default function AdminManagement() {
 
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const errs = {}
     if (!form.fullName.trim()) errs.fullName = 'Full name is required.'
     if (!form.email.trim()) errs.email = 'Email is required.'
     if (isNew && !form.password) errs.password = 'A temporary password is required.'
-    if (form.password && form.password.length < 6) errs.password = 'Password must be at least 6 characters.'
+    if (form.password && form.password.length < 8) errs.password = 'Password must be at least 8 characters.'
     setErrors(errs)
     if (Object.keys(errs).length) return
 
-    const result = isNew ? createAdmin(form) : updateAdmin(editing.id, form)
+    setBusy(true)
+    const result = isNew ? await createAdmin(form) : await updateAdmin(editing.id, form)
+    setBusy(false)
     if (!result.success) {
-      setErrors({ email: result.error })
+      // The server checks for duplicate emails and weak passwords
+      if (Object.keys(result.fieldErrors).length) setErrors(result.fieldErrors)
+      else showToast(result.error, 'error')
       return
     }
     showToast(isNew ? 'Admin account created.' : 'Admin account updated.', 'success')
     setEditing(null)
   }
 
-  const handleToggleStatus = () => {
-    toggleAdminStatus(statusTarget.id)
-    showToast(statusTarget.status === 'active' ? 'Admin deactivated.' : 'Admin activated.', 'success')
+  const handleToggleStatus = async () => {
+    setBusy(true)
+    const result = await toggleAdminStatus(statusTarget.id)
+    setBusy(false)
+    if (result.success) showToast(statusTarget.status === 'active' ? 'Admin deactivated.' : 'Admin activated.', 'success')
+    else showToast(result.error, 'error')
     setStatusTarget(null)
   }
 
-  const handleDelete = () => {
-    deleteAdmin(deleteTarget.id)
-    showToast('Admin account deleted.', 'success')
+  const handleDelete = async () => {
+    setBusy(true)
+    const result = await deleteAdmin(deleteTarget.id)
+    setBusy(false)
+    if (result.success) showToast('Admin account deleted.', 'success')
+    else showToast(result.error, 'error')
     setDeleteTarget(null)
   }
 
@@ -98,6 +118,7 @@ export default function AdminManagement() {
         <Input placeholder="Search by name, email or role..." icon={Search} value={search} onChange={(e) => setSearch(e.target.value)} containerClassName="sm:col-span-2" />
       </div>
 
+      {loading ? <LoadingState label="Loading admin accounts..." /> : (
       <Table columns={['Admin ID', 'Name', 'Email', 'Role', 'Status', 'Created', 'Actions']}>
         {filtered.map((a) => {
           const isSelf = a.id === currentAdmin?.id
@@ -144,6 +165,7 @@ export default function AdminManagement() {
           )
         })}
       </Table>
+      )}
 
       <Modal
         open={!!editing}
@@ -153,7 +175,7 @@ export default function AdminManagement() {
         footer={
           <>
             <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
-            <Button onClick={handleSave}>{isNew ? 'Create Admin' : 'Save Changes'}</Button>
+            <Button onClick={handleSave} loading={busy}>{isNew ? 'Create Admin' : 'Save Changes'}</Button>
           </>
         }
       >
@@ -176,7 +198,7 @@ export default function AdminManagement() {
             value={form.password}
             onChange={update('password')}
             error={errors.password}
-            hint={isNew ? undefined : 'Leave blank to keep the current password.'}
+            hint={isNew ? 'At least 8 characters. Avoid common or all-number passwords.' : 'Leave blank to keep the current password. Changing it signs this admin out.'}
             required={isNew}
           />
         </div>
@@ -193,6 +215,7 @@ export default function AdminManagement() {
             : `${statusTarget?.fullName} will be able to log in again.`
         }
         confirmLabel={statusTarget?.status === 'active' ? 'Deactivate' : 'Activate'}
+        loading={busy}
         variant={statusTarget?.status === 'active' ? 'danger' : 'accent'}
       />
 
@@ -204,6 +227,7 @@ export default function AdminManagement() {
         description={`${deleteTarget?.fullName}'s account will be permanently removed. Their past actions stay in the audit log.`}
         confirmLabel="Delete"
         variant="danger"
+        loading={busy}
       />
     </div>
   )

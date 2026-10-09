@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Landmark, Plus, Pencil, Power, Trash2, ArrowRight } from 'lucide-react'
+import { Landmark, Plus, Pencil, Power, Trash2, ArrowRight, Info } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
@@ -10,6 +10,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import Badge from '../../components/ui/Badge'
 import EmptyState from '../../components/ui/EmptyState'
 import { useDataStore } from '../../context/DataStoreContext'
+import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useToast } from '../../context/ToastContext'
 import { FACILITIES, facilityLabel, resolveBankAccount } from '../../data/bankAccounts'
 
@@ -21,7 +22,11 @@ export default function BankDetailsPage() {
     bankAccounts, accountAssignments,
     addBankAccount, updateBankAccount, toggleBankAccountStatus, removeBankAccount, assignBankAccount,
   } = useDataStore()
+  const { isSuperAdmin } = useAdminAuth()
   const { showToast } = useToast()
+  // Only a Super Admin can change where customers pay; other admins see the setup read-only
+  const canEdit = isSuperAdmin
+  const [busy, setBusy] = useState(false)
 
   // null = closed, 'new' = creating, otherwise the account being edited
   const [editing, setEditing] = useState(null)
@@ -48,22 +53,39 @@ export default function BankDetailsPage() {
     setEditing(a)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const errs = {}
     if (!form.bankName.trim()) errs.bankName = 'Bank name is required.'
     if (!form.accountName.trim()) errs.accountName = 'Account name is required.'
     if (!/^\d{10}$/.test(form.accountNumber.trim())) errs.accountNumber = 'Enter a 10-digit account number.'
     setErrors(errs)
     if (Object.keys(errs).length) return
-    if (isNew) addBankAccount(form)
-    else updateBankAccount(editing.id, form)
+    setBusy(true)
+    const result = isNew ? await addBankAccount(form) : await updateBankAccount(editing.id, form)
+    setBusy(false)
+    if (!result.success) {
+      if (Object.keys(result.fieldErrors).length) setErrors(result.fieldErrors)
+      else showToast(result.error, 'error')
+      return
+    }
     showToast(isNew ? 'Bank account added.' : 'Bank account updated.', 'success')
     setEditing(null)
   }
 
-  const handleAssign = (facility, value) => {
-    assignBankAccount(facility, value === USE_DEFAULT ? '' : value, facilityLabel(facility))
-    showToast(`${facilityLabel(facility)} account updated.`, 'success')
+  const handleAssign = async (facility, value) => {
+    const result = await assignBankAccount(facility, value === USE_DEFAULT ? '' : value, facilityLabel(facility))
+    if (result.success) showToast(`${facilityLabel(facility)} account updated.`, 'success')
+    else showToast(result.error, 'error')
+  }
+
+  // Runs a confirm-dialog action and closes the dialog once the server answers
+  const confirmAction = async (action, message, close) => {
+    setBusy(true)
+    const result = await action()
+    setBusy(false)
+    if (result.success) showToast(message, 'success')
+    else showToast(result.error, 'error')
+    close()
   }
 
   const accountOptions = (facility) => [
@@ -76,8 +98,15 @@ export default function BankDetailsPage() {
       <PageHeader
         title="Bank Accounts"
         subtitle="Manage the accounts customers pay into, and choose which account each facility uses."
-        actions={<Button icon={Plus} onClick={openCreate}>Add Account</Button>}
+        actions={canEdit && <Button icon={Plus} onClick={openCreate}>Add Account</Button>}
       />
+
+      {!canEdit && (
+        <div className="flex items-start gap-2 bg-navy-50 text-navy-600 text-xs rounded-xl px-3.5 py-2.5 mb-5">
+          <Info size={15} className="mt-0.5 shrink-0" />
+          <p>Only a Super Admin can add, change or assign collection accounts.</p>
+        </div>
+      )}
 
       {/* ---- Accounts ---- */}
       <h3 className="text-sm font-bold text-navy-800 mb-3">Collection Accounts</h3>
@@ -106,7 +135,7 @@ export default function BankDetailsPage() {
                 <p className="text-xs text-navy-400 mt-3">
                   {usedBy.length ? <>Used for: <span className="font-semibold text-navy-600">{usedBy.join(', ')}</span></> : 'Not assigned to any facility'}
                 </p>
-                <div className="flex items-center gap-1.5 mt-4 pt-4 border-t border-navy-50">
+                {canEdit && <div className="flex items-center gap-1.5 mt-4 pt-4 border-t border-navy-50">
                   <Button size="sm" variant="outline" icon={Pencil} onClick={() => openEdit(a)}>Edit</Button>
                   <Button size="sm" variant="outline" icon={Power} onClick={() => setStatusTarget(a)}>
                     {a.status === 'active' ? 'Deactivate' : 'Activate'}
@@ -118,7 +147,7 @@ export default function BankDetailsPage() {
                   >
                     <Trash2 size={16} />
                   </button>
-                </div>
+                </div>}
               </Card>
             )
           })}
@@ -148,6 +177,7 @@ export default function BankDetailsPage() {
                 onChange={(e) => handleAssign(f.value, e.target.value)}
                 options={accountOptions(f.value)}
                 containerClassName="flex-1"
+                disabled={!canEdit}
               />
             </div>
           )
@@ -162,7 +192,7 @@ export default function BankDetailsPage() {
         footer={
           <>
             <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
-            <Button onClick={handleSave}>{isNew ? 'Add Account' : 'Save Changes'}</Button>
+            <Button onClick={handleSave} loading={busy}>{isNew ? 'Add Account' : 'Save Changes'}</Button>
           </>
         }
       >
@@ -177,11 +207,12 @@ export default function BankDetailsPage() {
       <ConfirmDialog
         open={!!statusTarget}
         onClose={() => setStatusTarget(null)}
-        onConfirm={() => {
-          toggleBankAccountStatus(statusTarget.id)
-          showToast(statusTarget.status === 'active' ? 'Bank account deactivated.' : 'Bank account activated.', 'success')
-          setStatusTarget(null)
-        }}
+        onConfirm={() => confirmAction(
+          () => toggleBankAccountStatus(statusTarget.id),
+          statusTarget.status === 'active' ? 'Bank account deactivated.' : 'Bank account activated.',
+          () => setStatusTarget(null),
+        )}
+        loading={busy}
         title={statusTarget?.status === 'active' ? 'Deactivate this account?' : 'Activate this account?'}
         description={
           statusTarget?.status === 'active'
@@ -195,11 +226,8 @@ export default function BankDetailsPage() {
       <ConfirmDialog
         open={!!removeTarget}
         onClose={() => setRemoveTarget(null)}
-        onConfirm={() => {
-          removeBankAccount(removeTarget.id)
-          showToast('Bank account removed.', 'success')
-          setRemoveTarget(null)
-        }}
+        onConfirm={() => confirmAction(() => removeBankAccount(removeTarget.id), 'Bank account removed.', () => setRemoveTarget(null))}
+        loading={busy}
         title="Remove this account?"
         description={`${removeTarget?.bankName} · ${removeTarget?.accountNumber} will be deleted and unassigned from all facilities. Past transactions keep the details they were paid to.`}
         confirmLabel="Remove"

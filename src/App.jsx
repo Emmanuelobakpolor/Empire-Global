@@ -1,4 +1,5 @@
 import { Routes, Route } from 'react-router-dom'
+import { SessionProvider } from './context/SessionContext'
 import { AuthProvider } from './context/AuthContext'
 import { AdminAuthProvider } from './context/AdminAuthContext'
 import { DataStoreProvider } from './context/DataStoreContext'
@@ -17,6 +18,8 @@ import Login from './pages/public/Login'
 import Register from './pages/public/Register'
 import ForgotPassword from './pages/public/ForgotPassword'
 import CompleteProfile from './pages/public/CompleteProfile'
+import VerifyEmail from './pages/public/VerifyEmail'
+import ResetPassword from './pages/public/ResetPassword'
 
 // Customer
 import Dashboard from './pages/customer/Dashboard'
@@ -29,6 +32,7 @@ import Transactions from './pages/customer/Transactions'
 import TransactionDetails from './pages/customer/TransactionDetails'
 import Profile from './pages/customer/Profile'
 import Notifications from './pages/customer/Notifications'
+import Withdrawals from './pages/customer/Withdrawals'
 import Savings from './pages/customer/Savings'
 import Investments from './pages/customer/Investments'
 import Loans from './pages/customer/Loans'
@@ -37,6 +41,10 @@ import Support from './pages/customer/Support'
 
 // Admin
 import AdminLogin from './pages/admin/AdminLogin'
+import AdminSetPassword from './pages/admin/AdminSetPassword'
+import AdminNotifications from './pages/admin/AdminNotifications'
+import AdminWithdrawals from './pages/admin/AdminWithdrawals'
+import AdminWithdrawalDetails from './pages/admin/AdminWithdrawalDetails'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import Customers from './pages/admin/Customers'
 import CustomerDetails from './pages/admin/CustomerDetails'
@@ -59,73 +67,83 @@ export default function App() {
   return (
     <ToastProvider>
       <DataStoreProvider>
-        <AuthProvider>
-          <AdminAuthProvider>
-            <Routes>
-              {/* Public */}
-              <Route path="/" element={<Landing />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/complete-profile" element={<CompleteProfile />} />
+        <SessionProvider>
+          <AuthProvider>
+            <AdminAuthProvider>
+              <Routes>
+                {/* Public */}
+                <Route path="/" element={<Landing />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/complete-profile" element={<CompleteProfile />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/admin/reset-password" element={<ResetPassword admin />} />
 
-              {/* Customer Portal */}
-              <Route
-                path="/customer"
-                element={
-                  <ProtectedRoute>
-                    <CustomerLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route path="dashboard" element={<Dashboard />} />
-                <Route path="products" element={<Products />} />
-                <Route path="products/:id" element={<ProductDetails />} />
-                <Route path="transactions/new" element={<CreateTransaction />} />
-                <Route path="payment" element={<PaymentInstructions />} />
-                <Route path="upload-receipt" element={<UploadReceipt />} />
-                <Route path="transactions" element={<Transactions />} />
-                <Route path="transactions/:id" element={<TransactionDetails />} />
-                <Route path="savings" element={<Savings />} />
-                <Route path="investments" element={<Investments />} />
-                <Route path="loans" element={<Loans />} />
-                <Route path="hire-purchase" element={<HirePurchase />} />
-                <Route path="profile" element={<Profile />} />
-                <Route path="notifications" element={<Notifications />} />
-                <Route path="support" element={<Support />} />
-              </Route>
+                {/* Customer Portal */}
+                <Route
+                  path="/customer"
+                  element={
+                    <ProtectedRoute>
+                      <CustomerLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="products" element={<Products />} />
+                  <Route path="products/:id" element={<ProductDetails />} />
+                  <Route path="transactions/new" element={<CreateTransaction />} />
+                  <Route path="payment" element={<PaymentInstructions />} />
+                  <Route path="upload-receipt" element={<UploadReceipt />} />
+                  <Route path="transactions" element={<Transactions />} />
+                  <Route path="transactions/:id" element={<TransactionDetails />} />
+                  <Route path="savings" element={<Savings />} />
+                  <Route path="investments" element={<Investments />} />
+                  <Route path="loans" element={<Loans />} />
+                  <Route path="hire-purchase" element={<HirePurchase />} />
+                  <Route path="profile" element={<Profile />} />
+                  <Route path="notifications" element={<Notifications />} />
+                  <Route path="withdrawals" element={<Withdrawals />} />
+                  <Route path="support" element={<Support />} />
+                </Route>
 
-              {/* Admin Portal */}
-              <Route path="/admin/login" element={<AdminLogin />} />
-              <Route
-                path="/admin"
-                element={
-                  <AdminProtectedRoute>
-                    <AdminLayout />
-                  </AdminProtectedRoute>
-                }
-              >
-                <Route path="dashboard" element={<AdminDashboard />} />
-                <Route path="customers" element={<Customers />} />
-                <Route path="customers/:id" element={<CustomerDetails />} />
-                <Route path="agents" element={<Agents />} />
-                <Route path="payments" element={<Payments />} />
-                <Route path="payments/:id" element={<PaymentDetails />} />
-                <Route path="transactions" element={<AdminTransactions />} />
-                <Route path="transactions/:id" element={<AdminTransactionDetails />} />
-                <Route path="products" element={<AdminProducts />} />
-                <Route path="reports" element={<Reports />} />
-                <Route path="bank-details" element={<BankDetailsPage />} />
-                <Route path="audit-logs" element={<AuditLogs />} />
-                <Route path="admins" element={<SuperAdminRoute><AdminManagement /></SuperAdminRoute>} />
-                <Route path="settings" element={<AdminSettings />} />
-              </Route>
+                {/* Admin Portal */}
+                <Route path="/admin/login" element={<AdminLogin />} />
+                <Route path="/admin/set-password" element={<AdminSetPassword />} />
+                <Route
+                  path="/admin"
+                  element={
+                    <AdminProtectedRoute>
+                      <AdminLayout />
+                    </AdminProtectedRoute>
+                  }
+                >
+                  <Route path="dashboard" element={<AdminDashboard />} />
+                  <Route path="customers" element={<Customers />} />
+                  <Route path="customers/:id" element={<CustomerDetails />} />
+                  <Route path="agents" element={<Agents />} />
+                  <Route path="payments" element={<Payments />} />
+                  <Route path="payments/:id" element={<PaymentDetails />} />
+                  <Route path="transactions" element={<AdminTransactions />} />
+                  <Route path="transactions/:id" element={<AdminTransactionDetails />} />
+                  <Route path="products" element={<AdminProducts />} />
+                  <Route path="reports" element={<Reports />} />
+                  <Route path="bank-details" element={<BankDetailsPage />} />
+                  <Route path="audit-logs" element={<AuditLogs />} />
+                  <Route path="admins" element={<SuperAdminRoute><AdminManagement /></SuperAdminRoute>} />
+                  <Route path="settings" element={<AdminSettings />} />
+                  <Route path="notifications" element={<AdminNotifications />} />
+                  <Route path="withdrawals" element={<AdminWithdrawals />} />
+                  <Route path="withdrawals/:reference" element={<AdminWithdrawalDetails />} />
+                </Route>
 
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            <WhatsAppButton />
-          </AdminAuthProvider>
-        </AuthProvider>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+              <WhatsAppButton />
+            </AdminAuthProvider>
+          </AuthProvider>
+        </SessionProvider>
       </DataStoreProvider>
     </ToastProvider>
   )

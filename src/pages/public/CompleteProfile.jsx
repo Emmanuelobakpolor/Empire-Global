@@ -6,8 +6,6 @@ import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
-import { useDataStore } from '../../context/DataStoreContext'
-import { validateAgentCode } from '../../utils/validateAgentCode'
 
 export default function CompleteProfile() {
   const { state } = useLocation()
@@ -19,8 +17,7 @@ export default function CompleteProfile() {
   })
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
-  const { register } = useAuth()
-  const { agents } = useDataStore()
+  const { completeGoogleSignup } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
 
@@ -33,8 +30,6 @@ export default function CompleteProfile() {
     const errs = {}
     if (!form.fullName.trim()) errs.fullName = 'Full name is required.'
     if (!form.phone.trim()) errs.phone = 'Phone number is required.'
-    const agentError = validateAgentCode(agents, form.agentCode)
-    if (agentError) errs.agentCode = agentError
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -43,11 +38,13 @@ export default function CompleteProfile() {
     e.preventDefault()
     if (!validate()) return
     setLoading(true)
-    const result = await register({ ...form, email: googleProfile.email, authProvider: 'google' })
+    const result = await completeGoogleSignup({ ...form, email: googleProfile.email })
     setLoading(false)
     if (result.success) {
       showToast('Account created successfully! Welcome to Empire Global.', 'success')
       navigate('/customer/dashboard')
+    } else {
+      showToast(result.error, 'error')
     }
   }
 

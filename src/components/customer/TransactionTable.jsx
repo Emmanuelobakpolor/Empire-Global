@@ -35,7 +35,7 @@ export default function TransactionTable({ transactions, basePath = '/customer/t
           <Td>{formatDate(t.date)}</Td>
           <Td><PlanPeriodCell transaction={t} /></Td>
           <Td>
-            <Badge status={t.status}>{t.status}</Badge>
+            <Badge status={t.status === 'draft' ? 'awaiting' : t.status}>{t.status === 'draft' ? 'Awaiting payment' : t.status}</Badge>
           </Td>
           <Td>
             <Link

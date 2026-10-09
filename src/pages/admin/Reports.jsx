@@ -10,6 +10,7 @@ import TransactionsChart from '../../components/admin/charts/TransactionsChart'
 import RevenueChart from '../../components/admin/charts/RevenueChart'
 import { useDataStore } from '../../context/DataStoreContext'
 import { useToast } from '../../context/ToastContext'
+import { downloadCsv, printReport } from '../../utils/exportReport'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { productTypes } from '../../data/products'
 import AgentFilter, { useAgentFilter } from '../../components/admin/AgentFilter'
@@ -48,8 +49,39 @@ export default function Reports() {
   const investmentTotal = approved.filter((t) => t.productType === 'investment').reduce((sum, t) => sum + t.amount, 0)
   const loansTotal = approved.filter((t) => t.productType === 'loan').reduce((sum, t) => sum + t.amount, 0)
 
+  const agentFor = (customerId) => customers.find((c) => c.id === customerId)?.agentCode || ''
+
   const handleExport = (format) => {
-    showToast(`Report export simulated successfully (${format}).`, 'info')
+    if (!filtered.length) {
+      showToast('There are no transactions to export for these filters.', 'info')
+      return
+    }
+    if (format === 'CSV') {
+      downloadCsv(filtered, agentFor)
+      showToast(`Exported ${filtered.length} transaction${filtered.length === 1 ? '' : 's'} to CSV.`, 'success')
+      return
+    }
+    const filtersText = [
+      dateFrom && `From ${dateFrom}`,
+      dateTo && `To ${dateTo}`,
+      productFilter && `Product: ${productFilter}`,
+      statusFilter && `Status: ${statusFilter}`,
+    ].filter(Boolean).join(' · ')
+    const opened = printReport({
+      title: 'Empire Global Transactions Report',
+      filtersText,
+      summary: [
+        { label: 'Transactions', value: filtered.length },
+        { label: 'Approved', value: approved.length },
+        { label: 'Pending', value: pending.length },
+        { label: 'Rejected', value: rejected.length },
+        { label: 'Total approved', value: formatCurrency(totalPayments) },
+      ],
+      transactions: filtered,
+      agentFor,
+      formatAmount: (amount) => formatCurrency(amount),
+    })
+    if (!opened) showToast('Allow pop-ups for this site to print or save the report as PDF.', 'error')
   }
 
   return (
@@ -60,7 +92,7 @@ export default function Reports() {
         actions={
           <>
             <Button variant="outline" icon={Download} onClick={() => handleExport('CSV')}>Export CSV</Button>
-            <Button variant="outline" icon={FileText} onClick={() => handleExport('PDF')}>Export PDF</Button>
+            <Button variant="outline" icon={FileText} onClick={() => handleExport('PDF')}>Print / Save PDF</Button>
           </>
         }
       />
@@ -92,11 +124,11 @@ export default function Reports() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-rise-in">
         <Card>
           <h3 className="text-sm font-bold text-navy-800 mb-4">Transaction Volume</h3>
-          <TransactionsChart />
+          <TransactionsChart transactions={filtered} />
         </Card>
         <Card>
           <h3 className="text-sm font-bold text-navy-800 mb-4">Revenue by Product</h3>
-          <RevenueChart />
+          <RevenueChart transactions={filtered} />
         </Card>
       </div>
     </div>

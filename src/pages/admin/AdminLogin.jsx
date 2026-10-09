@@ -1,20 +1,31 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Mail, Lock, Info, ShieldCheck } from 'lucide-react'
-import Logo from '../../components/Logo'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Mail, Lock, KeyRound } from 'lucide-react'
+import AdminAuthShell from '../../components/admin/AdminAuthShell'
 import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
-import { useAdminAuth, DEMO_ADMIN_EMAIL, DEMO_ADMIN_PASSWORD, DEMO_REGULAR_ADMIN_EMAIL } from '../../context/AdminAuthContext'
+import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useToast } from '../../context/ToastContext'
 
 export default function AdminLogin() {
-  const [email, setEmail] = useState(DEMO_ADMIN_EMAIL)
-  const [password, setPassword] = useState(DEMO_ADMIN_PASSWORD)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  // Set once the password is accepted and a sign-in code has been emailed
+  const [challenge, setChallenge] = useState(null)
   const { login } = useAdminAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
+
+  const finish = (user) => {
+    if (user.mustChangePassword) {
+      navigate('/admin/set-password', { replace: true })
+      return
+    }
+    showToast('Welcome back.', 'success')
+    navigate('/admin/dashboard')
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -26,63 +37,132 @@ export default function AdminLogin() {
     setLoading(true)
     const result = await login(email, password)
     setLoading(false)
-    if (result.success) {
-      showToast('Welcome back.', 'success')
-      navigate('/admin/dashboard')
-    } else {
+    if (!result.success) {
       setError(result.error)
+    } else if (result.twoFactorRequired) {
+      setPassword('')
+      setChallenge(result)
+    } else {
+      finish(result.user)
     }
   }
 
+  if (challenge) {
+    return <CodeStep challenge={challenge} onDone={finish} onRestart={() => setChallenge(null)} />
+  }
+
   return (
-    <div className="min-h-screen bg-navy-950 flex items-center justify-center px-4 py-12 relative overflow-hidden">
-      <div className="absolute inset-0 opacity-30" style={{
-        backgroundImage: 'radial-gradient(circle at 20% 20%, rgba(16,185,129,0.25), transparent 40%), radial-gradient(circle at 80% 80%, rgba(16,185,129,0.15), transparent 35%)'
-      }} />
-      <div className="relative w-full max-w-md">
-        <div className="flex justify-center mb-8">
-          <Logo variant="light" />
+    <AdminAuthShell title="Admin Portal" subtitle="Sign in to manage Empire Global operations.">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <Input label="Admin Email" type="email" icon={Mail} autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <Input label="Password" type="password" icon={Lock} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        {error && <p className="text-xs text-red-500 -mt-1" role="alert">{error}</p>}
+        <div className="flex justify-end -mt-1">
+          <Link to="/forgot-password" className="text-xs font-semibold text-navy-500 hover:text-emerald-600">
+            Forgot Password?
+          </Link>
         </div>
-        <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8">
-          <div className="flex items-center gap-2 justify-center mb-1">
-            <ShieldCheck size={18} className="text-emerald-500" />
-            <h1 className="text-xl font-bold text-navy-900">Admin Portal</h1>
-          </div>
-          <p className="text-sm text-navy-400 text-center mb-6">Sign in to manage Empire Global operations.</p>
+        <Button type="submit" fullWidth loading={loading} size="lg">
+          Continue
+        </Button>
+      </form>
+    </AdminAuthShell>
+  )
+}
 
-          <div className="flex items-start gap-2 bg-emerald-50 text-emerald-700 text-xs rounded-xl px-3.5 py-2.5 mb-6">
-            <Info size={15} className="mt-0.5 shrink-0" />
-            <div>
-              <p>Super Admin: <strong>{DEMO_ADMIN_EMAIL}</strong> / <strong>{DEMO_ADMIN_PASSWORD}</strong></p>
-              <p className="mt-0.5">Admin: <strong>{DEMO_REGULAR_ADMIN_EMAIL}</strong> / <strong>{DEMO_ADMIN_PASSWORD}</strong></p>
-            </div>
-          </div>
+// Step 2: the 6-digit code emailed after the password is accepted
+function CodeStep({ challenge, onDone, onRestart }) {
+  const { verifyLoginCode, resendLoginCode } = useAdminAuth()
+  const { showToast } = useToast()
+  const [code, setCode] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [secondsLeft, setSecondsLeft] = useState(challenge.resendIn)
+  const length = challenge.otpLength || 6
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <Input
-              label="Admin Email"
-              type="email"
-              icon={Mail}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <Input
-              label="Password"
-              type="password"
-              icon={Lock}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            {error && <p className="text-xs text-red-500 -mt-1">{error}</p>}
-            <Button type="submit" fullWidth loading={loading} size="lg">
-              Login to Admin Console
-            </Button>
-          </form>
+  useEffect(() => {
+    if (secondsLeft <= 0) return
+    const t = setTimeout(() => setSecondsLeft((s) => s - 1), 1000)
+    return () => clearTimeout(t)
+  }, [secondsLeft])
+
+  const expired = (message) => {
+    showToast(message, 'error')
+    onRestart()
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (code.length !== length) {
+      setError(`Enter the ${length}-digit code from your email.`)
+      return
+    }
+    setLoading(true)
+    const result = await verifyLoginCode(code)
+    setLoading(false)
+    if (result.success) onDone(result.user)
+    else if (result.expired) expired(result.error)
+    else {
+      setError(result.error)
+      setCode('')
+    }
+  }
+
+  const handleResend = async () => {
+    setResending(true)
+    const result = await resendLoginCode()
+    setResending(false)
+    if (result.success) {
+      setSecondsLeft(result.resendIn)
+      setError('')
+      showToast('A new code is on its way.', 'info')
+    } else if (result.retryAfter) setSecondsLeft(result.retryAfter)
+    else if (result.expired) expired(result.error)
+    else showToast(result.error, 'error')
+  }
+
+  return (
+    <AdminAuthShell title="Check Your Email" icon={KeyRound} subtitle={`We sent a ${length}-digit sign-in code to ${challenge.email}.`}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <Input
+          label="Sign-in Code"
+          icon={KeyRound}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          autoFocus
+          maxLength={length}
+          placeholder={'0'.repeat(length)}
+          value={code}
+          onChange={(e) => {
+            setCode(e.target.value.replace(/\D/g, '').slice(0, length))
+            setError('')
+          }}
+          error={error}
+          className="tracking-[0.4em] font-mono text-lg"
+          required
+        />
+        <Button type="submit" fullWidth loading={loading} size="lg">
+          Verify & Sign In
+        </Button>
+        <div className="flex items-center justify-between text-xs">
+          <button type="button" onClick={onRestart} className="font-semibold text-navy-500 hover:text-navy-800">
+            Use a different account
+          </button>
+          {secondsLeft > 0 ? (
+            <span className="text-navy-400">Resend in {secondsLeft}s</span>
+          ) : (
+            <button type="button" onClick={handleResend} disabled={resending} className="font-semibold text-emerald-600 hover:text-emerald-700 disabled:opacity-50">
+              {resending ? 'Sending…' : 'Resend code'}
+            </button>
+          )}
         </div>
-        <p className="text-center text-xs text-navy-500 mt-6">© {new Date().getFullYear()} Empire Global. Admin access only.</p>
-      </div>
-    </div>
+        {import.meta.env.DEV && (
+          <p className="text-xs text-navy-400 text-center rounded-lg bg-navy-50 px-3 py-2">
+            Development: unless Resend is configured, the code is printed in the Django server console.
+          </p>
+        )}
+      </form>
+    </AdminAuthShell>
   )
 }

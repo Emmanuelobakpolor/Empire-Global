@@ -7,16 +7,13 @@ import Button from '../../components/ui/Button'
 import GoogleAuthButton, { AuthDivider } from '../../components/GoogleAuthButton'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
-import { useDataStore } from '../../context/DataStoreContext'
-import { validateAgentCode } from '../../utils/validateAgentCode'
 
 export default function Register() {
   const [form, setForm] = useState({ fullName: '', email: '', phone: '', agentCode: '', password: '', confirmPassword: '' })
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
-  const { register, continueWithGoogle } = useAuth()
-  const { agents } = useDataStore()
+  const { startRegistration, continueWithGoogle } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
 
@@ -27,10 +24,8 @@ export default function Register() {
     if (!form.fullName.trim()) errs.fullName = 'Full name is required.'
     if (!form.email.trim()) errs.email = 'Email is required.'
     if (!form.phone.trim()) errs.phone = 'Phone number is required.'
-    const agentError = validateAgentCode(agents, form.agentCode)
-    if (agentError) errs.agentCode = agentError
     if (!form.password) errs.password = 'Password is required.'
-    else if (form.password.length < 6) errs.password = 'Password must be at least 6 characters.'
+    else if (form.password.length < 8) errs.password = 'Password must be at least 8 characters.'
     if (form.confirmPassword !== form.password) errs.confirmPassword = 'Passwords do not match.'
     setErrors(errs)
     return Object.keys(errs).length === 0
@@ -40,11 +35,16 @@ export default function Register() {
     e.preventDefault()
     if (!validate()) return
     setLoading(true)
-    const result = await register(form)
+    const result = await startRegistration(form)
     setLoading(false)
     if (result.success) {
-      showToast('Account created successfully! Welcome to Empire Global.', 'success')
-      navigate('/customer/dashboard')
+      showToast(`We sent a verification code to ${result.email}.`, 'info')
+      navigate('/verify-email')
+    } else if (Object.keys(result.fieldErrors).length) {
+      // The server checks password strength and existing accounts
+      setErrors(result.fieldErrors)
+    } else {
+      showToast(result.error, 'error')
     }
   }
 
@@ -52,7 +52,10 @@ export default function Register() {
     setGoogleLoading(true)
     const result = await continueWithGoogle({ intent: 'register' })
     setGoogleLoading(false)
-    if (!result.success) return
+    if (!result.success) {
+      showToast(result.error, 'error')
+      return
+    }
     if (result.isNewUser) {
       navigate('/complete-profile', { state: { googleProfile: result.googleProfile } })
     } else {
@@ -123,6 +126,7 @@ export default function Register() {
           value={form.password}
           onChange={update('password')}
           error={errors.password}
+          hint="At least 8 characters. Avoid common or all-number passwords."
           required
         />
         <Input

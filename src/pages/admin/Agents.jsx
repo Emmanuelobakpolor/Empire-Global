@@ -34,6 +34,7 @@ export default function Agents() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [errors, setErrors] = useState({})
   const [statusTarget, setStatusTarget] = useState(null)
+  const [busy, setBusy] = useState(false)
 
   const customerCount = useMemo(() => {
     const counts = {}
@@ -71,7 +72,7 @@ export default function Agents() {
 
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const errs = {}
     if (!form.name.trim()) errs.name = 'Agent name is required.'
     if (!form.phone.trim()) errs.phone = 'Phone number is required.'
@@ -79,19 +80,24 @@ export default function Agents() {
     setErrors(errs)
     if (Object.keys(errs).length) return
 
-    if (isNew) {
-      const result = createAgent(form)
-      if (result.success) showToast(`Agent created with code ${result.agent.code}.`, 'success')
-    } else {
-      updateAgent(editing.code, form)
-      showToast('Agent updated.', 'success')
+    setBusy(true)
+    const result = isNew ? await createAgent(form) : await updateAgent(editing.code, form)
+    setBusy(false)
+    if (!result.success) {
+      if (Object.keys(result.fieldErrors).length) setErrors(result.fieldErrors)
+      else showToast(result.error, 'error')
+      return
     }
+    showToast(isNew ? `Agent created with code ${result.agent.code}.` : 'Agent updated.', 'success')
     setEditing(null)
   }
 
-  const handleToggleStatus = () => {
-    toggleAgentStatus(statusTarget.code)
-    showToast(statusTarget.status === 'active' ? 'Agent deactivated.' : 'Agent activated.', 'success')
+  const handleToggleStatus = async () => {
+    setBusy(true)
+    const result = await toggleAgentStatus(statusTarget.code)
+    setBusy(false)
+    if (result.success) showToast(statusTarget.status === 'active' ? 'Agent deactivated.' : 'Agent activated.', 'success')
+    else showToast(result.error, 'error')
     setStatusTarget(null)
   }
 
@@ -160,7 +166,7 @@ export default function Agents() {
         footer={
           <>
             <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
-            <Button onClick={handleSave}>{isNew ? 'Create Agent' : 'Save Changes'}</Button>
+            <Button onClick={handleSave} loading={busy}>{isNew ? 'Create Agent' : 'Save Changes'}</Button>
           </>
         }
       >
@@ -196,6 +202,7 @@ export default function Agents() {
         }
         confirmLabel={statusTarget?.status === 'active' ? 'Deactivate' : 'Activate'}
         variant={statusTarget?.status === 'active' ? 'danger' : 'accent'}
+        loading={busy}
       />
     </div>
   )

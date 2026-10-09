@@ -1,17 +1,19 @@
 import { Mail, Phone, MessageCircle } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import Card from '../../components/ui/Card'
-
-const CHANNELS = [
-  { icon: Mail, label: 'Email Support', value: 'Info@empireglobalbenefits.com' },
-  { icon: Phone, label: 'Call Us', value: '+234 9068410302' },
-  { icon: MessageCircle, label: 'Support Hours', value: 'Monday – Friday, 8:00 AM – 5:00 PM (WAT)' },
-]
+import { usePlatformSettings } from '../../hooks/usePlatformSettings'
 
 export default function Support() {
+  const { supportEmail, supportPhone, platformName } = usePlatformSettings()
+  const CHANNELS = [
+    { icon: Mail, label: 'Email Support', value: supportEmail },
+    { icon: Phone, label: 'Call Us', value: supportPhone },
+    { icon: MessageCircle, label: 'Support Hours', value: 'Monday – Friday, 8:00 AM – 5:00 PM (WAT)' },
+  ]
+
   return (
     <div className="max-w-2xl">
-      <PageHeader title="Support" subtitle="Need help? Reach out to the Empire Global support team." />
+      <PageHeader title="Support" subtitle={`Need help? Reach out to the ${platformName} support team.`} />
       <div className="flex flex-col gap-4">
         {CHANNELS.map((c) => (
           <Card key={c.label} className="flex items-center gap-4">
