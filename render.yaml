@@ -1,0 +1,57 @@
+# Render Blueprint for the Django API (the React app is deployed separately on Vercel).
+# In Render: New > Blueprint > pick this repository. You'll be asked for the `sync: false` values.
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: empire-global-api
+    runtime: python
+    # Frankfurt is Render's closest region to Nigeria; the database must be in the same region
+    region: frankfurt
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    # Migrations also load the product catalogue and the collection bank accounts.
+    # Abandoned sign-ups are cleared on every start (free instances restart often).
+    startCommand: >-
+      python manage.py migrate --noinput &&
+      python manage.py createcachetable &&
+      python manage.py purge_pending_signups &&
+      gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14.4
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: empire-global-db
+          property: connectionString
+      # The Vercel site, e.g. https://empire-global.vercel.app (no trailing slash)
+      - key: FRONTEND_URL
+        sync: false
+      # cloudinary://<api_key>:<api_secret>@<cloud_name>
+      - key: CLOUDINARY_URL
+        sync: false
+      # `resend` sends real emails; `console` prints them (codes included) to the Render logs
+      - key: EMAIL_PROVIDER
+        value: resend
+      - key: RESEND_API_KEY
+        sync: false
+      # An address on a domain verified in Resend, e.g. Empire Global <no-reply@yourdomain.com>
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+      # Sent as X-Setup-Token to POST /api/setup/super-admin/ to create the first Super Admin
+      - key: SETUP_TOKEN
+        sync: false
+
+databases:
+  - name: empire-global-db
+    region: frankfurt
+    # Render's free Postgres is deleted 30 days after creation. Switch to a paid plan
+    # (e.g. basic-256mb) before real customers use the app.
+    plan: free
+    databaseName: empire_global
+    user: empire_global
