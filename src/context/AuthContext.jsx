@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react'
 import { useSession } from './SessionContext'
 import { api, failure } from '../utils/api'
+import { requestGoogleCode } from '../utils/googleAuth'
 
 const AuthContext = createContext(null)
 // Email sign-ups wait here (no password) until their OTP is confirmed
@@ -106,14 +107,40 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Google sign-in placeholder. Planned flow: Google Identity Services returns an ID
-  // token, the backend verifies it against GOOGLE_CLIENT_ID and either signs the user
-  // in or returns { isNewUser, googleProfile } so they can complete their profile.
-  const continueWithGoogle = async () => ({ success: false, error: GOOGLE_NOT_READY })
+  // Google's popup returns a one-time code; the backend verifies it with Google and either
+  // signs the customer in or returns { isNewUser, googleProfile } so they can complete their
+  // profile. Call it straight from the button's click handler so the popup isn't blocked.
+  const continueWithGoogle = async () => {
+    let google
+    try {
+      google = await requestGoogleCode()
+    } catch (err) {
+      return failure(err)
+    }
+    if (google.disabled) return { success: false, error: GOOGLE_NOT_READY }
+    if (google.cancelled) return { success: false, cancelled: true }
+    if (google.error) return { success: false, error: google.error }
+    try {
+      const data = await api('/auth/google/', { method: 'POST', body: { code: google.code } })
+      if (data.isNewUser) return { success: true, isNewUser: true, googleProfile: data.googleProfile }
+      setAccount(data.user)
+      return { success: true }
+    } catch (err) {
+      return failure(err)
+    }
+  }
 
-  // Second half of the Google flow (CompleteProfile page): will send phone/agent code
-  // with the verified Google identity once the backend endpoint exists.
-  const completeGoogleSignup = async () => ({ success: false, error: GOOGLE_NOT_READY })
+  // Second half for a first-time Google user (CompleteProfile page). The verified Google
+  // identity is held in their server session, so only these details are sent.
+  const completeGoogleSignup = async ({ fullName, phone, agentCode }) => {
+    try {
+      const data = await api('/auth/google/complete/', { method: 'POST', body: { fullName, phone, agentCode } })
+      setAccount(data.user)
+      return { success: true }
+    } catch (err) {
+      return { ...failure(err), expired: err.code === 'google_signup_expired' }
+    }
+  }
 
   const logout = () => signOut()
 

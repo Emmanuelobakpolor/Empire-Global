@@ -6,6 +6,7 @@ import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import GoogleAuthButton, { AuthDivider } from '../../components/GoogleAuthButton'
 import { useAuth } from '../../context/AuthContext'
+import { useGoogleAvailable } from '../../utils/googleAuth'
 import { useToast } from '../../context/ToastContext'
 
 export default function Login() {
@@ -14,6 +15,7 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const googleAvailable = useGoogleAvailable()
   const { login, continueWithGoogle } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
@@ -41,8 +43,9 @@ export default function Login() {
 
   const handleGoogle = async () => {
     setGoogleLoading(true)
-    const result = await continueWithGoogle({ intent: 'login' })
+    const result = await continueWithGoogle()
     setGoogleLoading(false)
+    if (result.cancelled) return
     if (!result.success) {
       showToast(result.error, 'error')
       return
@@ -68,8 +71,12 @@ export default function Login() {
         </>
       }
     >
-      <GoogleAuthButton onClick={handleGoogle} loading={googleLoading} />
-      <AuthDivider>or login with email</AuthDivider>
+      {googleAvailable !== false && (
+        <>
+          <GoogleAuthButton onClick={handleGoogle} loading={googleLoading} disabled={googleAvailable === null} />
+          <AuthDivider>or login with email</AuthDivider>
+        </>
+      )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <Input

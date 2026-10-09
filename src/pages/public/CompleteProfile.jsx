@@ -38,11 +38,16 @@ export default function CompleteProfile() {
     e.preventDefault()
     if (!validate()) return
     setLoading(true)
-    const result = await completeGoogleSignup({ ...form, email: googleProfile.email })
+    const result = await completeGoogleSignup(form)
     setLoading(false)
     if (result.success) {
       showToast('Account created successfully! Welcome to Empire Global.', 'success')
       navigate('/customer/dashboard')
+    } else if (result.expired) {
+      showToast(result.error, 'error')
+      navigate('/register', { replace: true })
+    } else if (Object.keys(result.fieldErrors).length) {
+      setErrors(result.fieldErrors)
     } else {
       showToast(result.error, 'error')
     }

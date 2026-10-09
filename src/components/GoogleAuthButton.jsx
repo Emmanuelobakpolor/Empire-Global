@@ -11,12 +11,12 @@ function GoogleIcon() {
   )
 }
 
-export default function GoogleAuthButton({ onClick, loading = false, label = 'Continue with Google' }) {
+export default function GoogleAuthButton({ onClick, loading = false, disabled = false, label = 'Continue with Google' }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={loading}
+      disabled={loading || disabled}
       className="w-full flex items-center justify-center gap-3 rounded-xl border border-navy-200 bg-white px-4 py-3 text-sm font-semibold text-navy-800 transition-colors hover:bg-slate-50 hover:border-navy-300 focus:outline-none focus:ring-4 focus:ring-emerald-500/15 disabled:opacity-60 disabled:cursor-not-allowed"
     >
       {loading ? <Loader2 size={18} className="animate-spin text-navy-400" /> : <GoogleIcon />}

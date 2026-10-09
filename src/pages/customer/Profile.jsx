@@ -145,19 +145,31 @@ export default function Profile() {
           <Card>
             <h3 className="text-sm font-bold text-navy-800 mb-4">Security</h3>
             <div className="flex flex-col divide-y divide-navy-50">
-              <button
-                onClick={() => setPasswordOpen(true)}
-                className="flex items-center justify-between py-3.5 text-left group"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="w-9 h-9 rounded-lg bg-navy-50 text-navy-600 flex items-center justify-center"><Lock size={16} /></span>
+              {user?.hasPassword === false ? (
+                <div className="flex items-center gap-3 py-3.5">
+                  <span className="w-9 h-9 rounded-lg bg-navy-50 text-navy-600 flex items-center justify-center shrink-0"><Lock size={16} /></span>
                   <div>
-                    <p className="text-sm font-semibold text-navy-800">Change Password</p>
-                    <p className="text-xs text-navy-400">Update your account password</p>
+                    <p className="text-sm font-semibold text-navy-800">Signed in with Google</p>
+                    <p className="text-xs text-navy-400">
+                      Your account has no password. To also sign in with email and password, use “Forgot password” on the login page.
+                    </p>
                   </div>
                 </div>
-                <span className="text-xs font-semibold text-emerald-600 group-hover:text-emerald-700">Change</span>
-              </button>
+              ) : (
+                <button
+                  onClick={() => setPasswordOpen(true)}
+                  className="flex items-center justify-between py-3.5 text-left group"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="w-9 h-9 rounded-lg bg-navy-50 text-navy-600 flex items-center justify-center"><Lock size={16} /></span>
+                    <div>
+                      <p className="text-sm font-semibold text-navy-800">Change Password</p>
+                      <p className="text-xs text-navy-400">Update your account password</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-semibold text-emerald-600 group-hover:text-emerald-700">Change</span>
+                </button>
+              )}
               <button
                 onClick={() => setLogoutOpen(true)}
                 className="flex items-center justify-between py-3.5 text-left group"
