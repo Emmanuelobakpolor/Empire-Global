@@ -4,7 +4,7 @@
 
 services:
   - type: web
-    name: empire-global-api
+    name: empireglobal-backend
     runtime: python
     # Frankfurt is Render's closest region to Nigeria; the database must be in the same region
     region: frankfurt
