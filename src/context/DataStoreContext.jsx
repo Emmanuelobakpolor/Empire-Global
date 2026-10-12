@@ -169,9 +169,11 @@ export function DataStoreProvider({ children }) {
   const recommendPayment = (transactionId, decision, note) =>
     reviewAction(transactionId, 'recommend', { decision, note: note || '' })
 
-  const approvePayment = async (transactionId, note) => {
+  // interestRate: loan and hire-purchase applications only (the product's rate when omitted)
+  const approvePayment = async (transactionId, note, interestRate) => {
     if (!isSuperAdmin()) return { success: false, error: 'Only a Super Admin can give final approval.' }
-    const result = await reviewAction(transactionId, 'approve', { note: note || '' })
+    const body = { note: note || '', ...(interestRate !== undefined && interestRate !== '' && { interestRate: Number(interestRate) }) }
+    const result = await reviewAction(transactionId, 'approve', body)
     // The customer's balance changed on the server
     if (result.success) refreshCustomers()
     return result
@@ -180,6 +182,33 @@ export function DataStoreProvider({ children }) {
   const rejectPayment = (transactionId, reason) => {
     if (!isSuperAdmin()) return Promise.resolve({ success: false, error: 'Only a Super Admin can reject a payment.' })
     return reviewAction(transactionId, 'reject', { note: reason || '' })
+  }
+
+  // ---- Loans and hire-purchase ----
+  // An admin records the payout (or delivery), which starts the repayment schedule on the server
+  const disburseFacility = async (transactionId, reference) => {
+    const result = await reviewAction(transactionId, 'disburse', { reference })
+    if (result.success) refreshCustomers()
+    return result
+  }
+
+  // The customer uploads the receipt for one instalment, once its payment details have appeared
+  const uploadRepaymentReceipt = async (repaymentId, file) => {
+    const form = new FormData()
+    form.append('file', file)
+    const result = await call(`/repayments/${repaymentId}/upload-receipt/`, { method: 'POST', body: form })
+    if (result.success) replaceTransaction(result.transaction)
+    return result
+  }
+
+  // action: 'recommend' (any admin, body { decision, note }) | 'approve' | 'reject' (Super Admin, body { note })
+  const repaymentAction = async (repaymentId, action, body = {}) => {
+    const result = await call(`/admin/repayments/${repaymentId}/${action}/`, { method: 'POST', body }, { audited: true })
+    if (result.success) {
+      replaceTransaction(result.transaction)
+      if (action === 'approve') refreshCustomers()
+    }
+    return result
   }
 
   // ---- Withdrawals ----
@@ -469,6 +498,9 @@ export function DataStoreProvider({ children }) {
     recommendPayment,
     approvePayment,
     rejectPayment,
+    disburseFacility,
+    uploadRepaymentReceipt,
+    repaymentAction,
     refreshWithdrawals,
     getWithdrawablePlans,
     quoteWithdrawal,

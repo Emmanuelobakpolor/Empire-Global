@@ -45,7 +45,8 @@ export default function Payments() {
   const [stageFilter, setStageFilter] = useState('')
   const agentFilter = useAgentFilter()
 
-  const paymentTransactions = transactions.filter((t) => t.status !== 'draft')
+  // Loan and hire-purchase applications and repayments are reviewed under Loans & Hire-Purchase
+  const paymentTransactions = transactions.filter((t) => t.status !== 'draft' && !t.facility)
 
   const filtered = useMemo(() => {
     return paymentTransactions.filter((t) => {

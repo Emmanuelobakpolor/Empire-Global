@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, UserPlus, Pencil, Power, Users, User, Phone, MapPin, BadgeCheck } from 'lucide-react'
+import { Search, UserPlus, Pencil, Power, Users, Phone, MapPin, BadgeCheck } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
@@ -10,6 +10,8 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import Table, { Tr, Td } from '../../components/ui/Table'
 import Badge from '../../components/ui/Badge'
 import EmptyState from '../../components/ui/EmptyState'
+import NameFields from '../../components/ui/NameFields'
+import { joinName, nameErrors, splitName } from '../../utils/personName'
 import { useDataStore } from '../../context/DataStoreContext'
 import { useToast } from '../../context/ToastContext'
 import { formatDate } from '../../utils/formatDate'
@@ -21,7 +23,7 @@ const STATUS_OPTIONS = [
   { value: 'inactive', label: 'Inactive' },
 ]
 
-const EMPTY_FORM = { name: '', phone: '', location: '' }
+const EMPTY_FORM = { firstName: '', lastName: '', phone: '', location: '' }
 
 export default function Agents() {
   const { agents, customers, createAgent, updateAgent, toggleAgentStatus } = useDataStore()
@@ -65,7 +67,7 @@ export default function Agents() {
   }
 
   const openEdit = (a) => {
-    setForm({ name: a.name, phone: a.phone, location: a.location })
+    setForm({ ...splitName(a.name), phone: a.phone, location: a.location })
     setErrors({})
     setEditing(a)
   }
@@ -73,18 +75,19 @@ export default function Agents() {
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
   const handleSave = async () => {
-    const errs = {}
-    if (!form.name.trim()) errs.name = 'Agent name is required.'
+    const errs = nameErrors(form)
     if (!form.phone.trim()) errs.phone = 'Phone number is required.'
     if (!form.location.trim()) errs.location = 'Location is required.'
     setErrors(errs)
     if (Object.keys(errs).length) return
 
     setBusy(true)
-    const result = isNew ? await createAgent(form) : await updateAgent(editing.code, form)
+    const data = { ...form, name: joinName(form) }
+    const result = isNew ? await createAgent(data) : await updateAgent(editing.code, data)
     setBusy(false)
     if (!result.success) {
-      if (Object.keys(result.fieldErrors).length) setErrors(result.fieldErrors)
+      const { name, ...fieldErrors } = result.fieldErrors
+      if (Object.keys(result.fieldErrors).length) setErrors(name ? { ...fieldErrors, firstName: name } : fieldErrors)
       else showToast(result.error, 'error')
       return
     }
@@ -171,7 +174,7 @@ export default function Agents() {
         }
       >
         <div className="flex flex-col gap-4">
-          <Input label="Full Name" icon={User} placeholder="e.g. Kunle Adebayo" value={form.name} onChange={update('name')} error={errors.name} required />
+          <NameFields value={form} onChange={(name) => setForm((f) => ({ ...f, ...name }))} errors={errors} />
           <Input label="Phone Number" icon={Phone} placeholder="+234 800 000 0000" value={form.phone} onChange={update('phone')} error={errors.phone} required />
           <Input
             label="Location"

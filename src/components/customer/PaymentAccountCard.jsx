@@ -8,10 +8,13 @@ import { productTypes } from '../../data/products'
 
 // Where to pay for a transaction: the collection account for its facility, recorded by the
 // server when the transaction was created. Every value can be copied into a banking app.
-export default function PaymentAccountCard({ transaction, className = 'mb-6' }) {
+// A loan or hire-purchase instalment passes its own `payment` ({ account, amount, reference, label }).
+export default function PaymentAccountCard({ transaction, payment, className = 'mb-6' }) {
   const { showToast } = useToast()
   const [copied, setCopied] = useState('')
-  const account = transaction.paymentAccount
+  const account = payment ? payment.account : transaction.paymentAccount
+  const amount = payment ? payment.amount : transaction.amount
+  const reference = payment ? payment.reference : transaction.reference
 
   if (!account) {
     return (
@@ -25,14 +28,14 @@ export default function PaymentAccountCard({ transaction, className = 'mb-6' }) 
 
   const facility = productTypes.find((t) => t.value === transaction.productType)?.label || transaction.productType
   // Banking apps want plain digits, not "₦25,000.00"
-  const plainAmount = String(Number(transaction.amount))
+  const plainAmount = String(Number(amount))
 
   const rows = [
     { key: 'accountNumber', label: 'Account Number', value: account.accountNumber, copyValue: account.accountNumber, big: true },
     { key: 'bank', label: 'Bank', value: account.bankName, copyValue: account.bankName },
     { key: 'accountName', label: 'Account Name', value: account.accountName, copyValue: account.accountName },
-    { key: 'amount', label: 'Amount', value: formatCurrency(transaction.amount), copyValue: plainAmount },
-    { key: 'reference', label: 'Narration / Reference', value: transaction.reference, copyValue: transaction.reference, mono: true },
+    { key: 'amount', label: 'Amount', value: formatCurrency(amount), copyValue: plainAmount },
+    { key: 'reference', label: 'Narration / Reference', value: reference, copyValue: reference, mono: true },
   ]
 
   const copy = async (key, value, label) => {
@@ -51,7 +54,7 @@ export default function PaymentAccountCard({ transaction, className = 'mb-6' }) 
     `Account Number: ${account.accountNumber}`,
     `Account Name: ${account.accountName}`,
     `Amount: ${plainAmount}`,
-    `Narration: ${transaction.reference}`,
+    `Narration: ${reference}`,
   ].join('\n')
 
   return (
@@ -63,7 +66,7 @@ export default function PaymentAccountCard({ transaction, className = 'mb-6' }) 
         <div className="min-w-0">
           <p className="text-sm font-bold text-navy-900">Pay into this {facility} account</p>
           <p className="text-xs text-navy-400 mt-0.5">
-            For <strong className="text-navy-600">{transaction.productName}</strong>. Use the reference below as your transfer narration.
+            For <strong className="text-navy-600">{payment?.label || transaction.productName}</strong>. Use the reference below as your transfer narration.
           </p>
         </div>
       </div>

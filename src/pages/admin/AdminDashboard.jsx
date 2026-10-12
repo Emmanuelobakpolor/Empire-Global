@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom'
-import { Users, Clock, CheckCircle2, Receipt, ArrowRight, ShieldCheck } from 'lucide-react'
+import { Users, Clock, CheckCircle2, Receipt, ArrowRight, ShieldCheck, HandCoins } from 'lucide-react'
 import AgentFilter, { useAgentFilter } from '../../components/admin/AgentFilter'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { slipStage } from '../../utils/slipReview'
+import { needsAction } from '../../utils/facility'
 import PageHeader from '../../components/ui/PageHeader'
 import StatCard from '../../components/ui/StatCard'
 import Card from '../../components/ui/Card'
@@ -23,9 +24,10 @@ export default function AdminDashboard() {
   const customers = store.customers.filter((c) => agentFilter.matches(c.agentCode))
   const transactions = store.transactions.filter((t) => agentFilter.matchesCustomer(t.customerId))
   const auditLogs = store.auditLogs.filter((l) => agentFilter.matches(l.agentCode))
-  const awaitingFinal = transactions.filter((t) => slipStage(t).label.includes('awaiting Super Admin'))
+  const awaitingFinal = transactions.filter((t) => !t.facility && slipStage(t).label.includes('awaiting Super Admin'))
 
-  const pendingPayments = transactions.filter((t) => t.status === 'pending' || t.status === 'processing')
+  const pendingPayments = transactions.filter((t) => !t.facility && (t.status === 'pending' || t.status === 'processing'))
+  const facilityWork = transactions.filter(needsAction)
   const approvedTotal = transactions.filter((t) => t.status === 'approved').reduce((sum, t) => sum + t.amount, 0)
   const recentTransactions = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6)
   const recentActivity = auditLogs.slice(0, 5)
@@ -52,6 +54,19 @@ export default function AdminDashboard() {
           <span className="flex items-center gap-2">
             <ShieldCheck size={17} />
             <strong>{awaitingFinal.length}</strong> payment slip{awaitingFinal.length === 1 ? '' : 's'} recommended by admins {awaitingFinal.length === 1 ? 'is' : 'are'} awaiting your final approval.
+          </span>
+          <ArrowRight size={16} className="shrink-0" />
+        </Link>
+      )}
+
+      {facilityWork.length > 0 && (
+        <Link
+          to="/admin/facilities"
+          className="flex items-center justify-between gap-3 rounded-2xl border border-amber-100 bg-amber-50 px-5 py-4 mb-6 text-sm text-amber-800 hover:bg-amber-100/70"
+        >
+          <span className="flex items-center gap-2">
+            <HandCoins size={17} />
+            <strong>{facilityWork.length}</strong> loan or hire-purchase item{facilityWork.length === 1 ? ' needs' : 's need'} attention (applications, payouts or repayment receipts).
           </span>
           <ArrowRight size={16} className="shrink-0" />
         </Link>

@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   UserCog,
   BadgeCheck,
+  HandCoins,
 } from 'lucide-react'
 import Logo from '../Logo'
 import { useAdminAuth } from '../../context/AdminAuthContext'
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { to: '/admin/customers', label: 'Customers', icon: Users },
   { to: '/admin/agents', label: 'Agents', icon: BadgeCheck },
   { to: '/admin/payments', label: 'Payments', icon: Wallet },
+  { to: '/admin/facilities', label: 'Loans & Hire-Purchase', icon: HandCoins },
   { to: '/admin/withdrawals', label: 'Withdrawals', icon: ArrowDownToLine },
   { to: '/admin/transactions', label: 'Transactions', icon: Receipt },
   { to: '/admin/products', label: 'Products', icon: Package },

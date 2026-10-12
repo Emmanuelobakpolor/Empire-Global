@@ -4,6 +4,7 @@ import StatCard from '../../components/ui/StatCard'
 import Card from '../../components/ui/Card'
 import CountUp from '../../components/ui/CountUp'
 import TransactionTable from '../../components/customer/TransactionTable'
+import UpcomingRepayments from '../../components/customer/UpcomingRepayments'
 import { useAuth } from '../../context/AuthContext'
 import { useDataStore } from '../../context/DataStoreContext'
 import { useCustomerAccount } from '../../hooks/useCustomerAccount'
@@ -37,6 +38,8 @@ export default function Dashboard() {
   const allMine = transactions.filter((t) => t.customerId === user?.id)
   const myTransactions = allMine.slice(0, 5)
   const pendingApplications = allMine.filter((t) => ['draft', 'pending', 'processing'].includes(t.status))
+  // Loans and hire-purchase approved and waiting to be paid out or delivered
+  const awaitingDisbursement = allMine.filter((t) => t.facility?.status === 'awaiting_disbursement')
 
   // Savings and investments approved this month (what actually moved the total balance)
   const thisMonth = new Date().toISOString().slice(0, 7)
@@ -48,8 +51,9 @@ export default function Dashboard() {
   const featuredProducts = products.filter((p) => p.status === 'active').slice(0, 3)
 
   // Plans ending in the next 30 days, plus ones that ended in the last 30 so a lapsed plan isn't missed
+  // Loans and hire-purchase are tracked by their repayments instead
   const endingSoon = allMine
-    .filter((t) => !['draft', 'rejected'].includes(t.status))
+    .filter((t) => !['draft', 'rejected'].includes(t.status) && !t.facility)
     .map((t) => ({ txn: t, period: planPeriod(t, products) }))
     .filter(({ period }) => period?.end && period.daysLeft !== null && period.daysLeft >= -30 && period.daysLeft <= 30)
     .sort((a, b) => a.period.daysLeft - b.period.daysLeft)
@@ -137,16 +141,19 @@ export default function Dashboard() {
         </div>
       </Card>
 
-      {pendingApplications.length > 0 && (
+      <UpcomingRepayments transactions={allMine} />
+
+      {(pendingApplications.length > 0 || awaitingDisbursement.length > 0) && (
         <Card className="mb-6 animate-rise-in !p-0 overflow-hidden">
           <div className="flex items-center gap-2 px-5 pt-5 pb-3">
             <Clock size={16} className="text-amber-500" />
             <h3 className="text-sm font-bold text-navy-800">Pending Applications</h3>
-            <span className="text-[11px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">{pendingApplications.length}</span>
+            <span className="text-[11px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">{pendingApplications.length + awaitingDisbursement.length}</span>
           </div>
           <div className="divide-y divide-navy-50 stagger-children">
-            {pendingApplications.map((t) => {
+            {[...pendingApplications, ...awaitingDisbursement].map((t) => {
               const awaitingPayment = t.status === 'draft'
+              const approved = t.facility?.status === 'awaiting_disbursement'
               return (
                 <div key={t.id} className="group flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-navy-50/40">
                   <div className="flex items-center gap-3 min-w-0">
@@ -162,8 +169,8 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Badge status={awaitingPayment ? 'awaiting' : 'pending'}>
-                      {awaitingPayment ? 'Awaiting payment' : 'Under review'}
+                    <Badge status={awaitingPayment || approved ? 'awaiting' : 'pending'} className="!normal-case">
+                      {awaitingPayment ? 'Awaiting payment' : approved ? (t.productType === 'loan' ? 'Approved · awaiting payout' : 'Approved · awaiting delivery') : 'Under review'}
                     </Badge>
                     <Link
                       to={awaitingPayment ? `/customer/upload-receipt?ref=${t.reference}` : `/customer/transactions/${t.id}`}

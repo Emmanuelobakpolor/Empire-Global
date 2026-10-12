@@ -9,6 +9,8 @@ import ReceiptPreview from '../../components/ReceiptPreview'
 import TransactionTimeline from '../../components/customer/TransactionTimeline'
 import PlanPeriodCard from '../../components/PlanPeriod'
 import PaymentAccountCard from '../../components/customer/PaymentAccountCard'
+import FacilityPanel from '../../components/customer/FacilityPanel'
+import { facilityStatus, frequencyLabel } from '../../utils/facility'
 import { useDataStore } from '../../context/DataStoreContext'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatDate } from '../../utils/formatDate'
@@ -31,6 +33,12 @@ export default function TransactionDetails() {
     )
   }
 
+  // Loans and hire-purchase are applied for, paid out, then repaid by instalment
+  const facility = transaction.facility
+  const badge = facility
+    ? facilityStatus(transaction)
+    : transaction.status === 'draft' ? { badge: 'awaiting', label: 'Awaiting payment' } : { badge: transaction.status, label: transaction.status }
+
   return (
     <div className="max-w-4xl">
       <button
@@ -46,8 +54,8 @@ export default function TransactionDetails() {
             <p className="text-xs text-navy-400 font-mono">{transaction.reference}</p>
             <h1 className="text-xl font-bold text-navy-900 mt-1">{transaction.productName}</h1>
           </div>
-          <Badge status={transaction.status === 'draft' ? 'awaiting' : transaction.status} className="!text-sm !px-3 !py-1.5">
-            {transaction.status === 'draft' ? 'Awaiting payment' : transaction.status}
+          <Badge status={badge.badge} className="!text-sm !px-3 !py-1.5 !normal-case">
+            {badge.label}
           </Badge>
         </div>
 
@@ -64,10 +72,17 @@ export default function TransactionDetails() {
             <p className="text-xs text-navy-400 flex items-center gap-1"><Calendar size={12} /> Date</p>
             <p className="text-sm font-bold text-navy-900 mt-1">{formatDate(transaction.date)}</p>
           </div>
-          <div>
-            <p className="text-xs text-navy-400 flex items-center gap-1"><FileText size={12} /> Receipt</p>
-            <p className="text-sm font-bold text-navy-900 mt-1 truncate">{transaction.receipt?.fileName || 'Not uploaded'}</p>
-          </div>
+          {facility ? (
+            <div>
+              <p className="text-xs text-navy-400 flex items-center gap-1"><FileText size={12} /> Repayment</p>
+              <p className="text-sm font-bold text-navy-900 mt-1">{frequencyLabel(facility.repaymentFrequency)}</p>
+            </div>
+          ) : (
+            <div>
+              <p className="text-xs text-navy-400 flex items-center gap-1"><FileText size={12} /> Receipt</p>
+              <p className="text-sm font-bold text-navy-900 mt-1 truncate">{transaction.receipt?.fileName || 'Not uploaded'}</p>
+            </div>
+          )}
         </div>
 
         {transaction.status === 'rejected' && transaction.rejectionReason && (
@@ -77,8 +92,10 @@ export default function TransactionDetails() {
         )}
       </Card>
 
+      {facility && <FacilityPanel transaction={transaction} />}
+
       {/* Until a decision is made, keep the account to pay into one tap away */}
-      {!['approved', 'rejected'].includes(transaction.status) && (
+      {!facility && !['approved', 'rejected'].includes(transaction.status) && (
         <>
           <PaymentAccountCard transaction={transaction} />
           {transaction.status === 'draft' && (
@@ -89,7 +106,7 @@ export default function TransactionDetails() {
         </>
       )}
 
-      <PlanPeriodCard transaction={transaction} />
+      {!facility && <PlanPeriodCard transaction={transaction} />}
 
       {transaction.receipt && (
         <Card className="mb-6">

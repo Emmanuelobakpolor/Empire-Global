@@ -12,11 +12,8 @@ import { useDataStore } from '../../context/DataStoreContext'
 import { useToast } from '../../context/ToastContext'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatDate } from '../../utils/formatDate'
+import { NIGERIAN_BANKS } from '../../data/banks'
 
-const NIGERIAN_BANKS = [
-  'Access Bank', 'Ecobank', 'Fidelity Bank', 'First Bank', 'FCMB', 'GTBank', 'Kuda', 'Moniepoint', 'Opay',
-  'PalmPay', 'Polaris Bank', 'Stanbic IBTC', 'Sterling Bank', 'UBA', 'Union Bank', 'Wema Bank', 'Zenith Bank',
-]
 
 export const WITHDRAWAL_STATUS = {
   pending: { label: 'Under review', badge: 'pending' },

@@ -4,6 +4,7 @@ import Card from '../../components/ui/Card'
 import StatCard from '../../components/ui/StatCard'
 import ProductCard from '../../components/customer/ProductCard'
 import TransactionTable from '../../components/customer/TransactionTable'
+import UpcomingRepayments from '../../components/customer/UpcomingRepayments'
 import EmptyState from '../../components/ui/EmptyState'
 import LoadingState from '../../components/ui/LoadingState'
 import { useAuth } from '../../context/AuthContext'
@@ -19,12 +20,34 @@ export default function ProductCategoryPage({ type, title, subtitle, icon: Icon,
   const categoryTransactions = transactions.filter((t) => t.customerId === user?.id && t.productType === type && t.status !== 'draft')
   const account = useCustomerAccount()
   const balance = balanceKey ? account?.[balanceKey] || 0 : null
+  // Loans and hire-purchase: what's owed, what's being repaid and what's under review
+  const isFacility = type === 'loan' || type === 'hire-purchase'
+  const facilities = categoryTransactions.filter((t) => t.facility)
+  const outstanding = facilities
+    .filter((t) => t.facility.status === 'active')
+    .reduce((sum, t) => sum + (t.facility.outstanding || 0), 0)
 
   return (
     <div>
       <PageHeader title={title} subtitle={subtitle} />
 
-      {balance !== null && (
+      {isFacility && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 stagger-children">
+            <StatCard label="Outstanding" value={formatCurrency(type === 'loan' ? balance : outstanding)} icon={Icon} tone="amber" />
+            <StatCard label="Repaying" value={facilities.filter((t) => t.facility.status === 'active').length} icon={Icon} tone="navy" />
+            <StatCard
+              label="Applications in Progress"
+              value={facilities.filter((t) => ['under_review', 'awaiting_disbursement'].includes(t.facility.status)).length}
+              icon={Icon}
+              tone="emerald"
+            />
+          </div>
+          <UpcomingRepayments transactions={facilities} />
+        </>
+      )}
+
+      {balance !== null && !isFacility && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 stagger-children">
           <StatCard label={`${title} Balance`} value={formatCurrency(balance)} icon={Icon} tone="emerald" />
           <StatCard label="Active Plans" value={categoryTransactions.filter((t) => t.status === 'approved').length} icon={Icon} tone="navy" />

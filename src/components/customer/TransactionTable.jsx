@@ -6,6 +6,7 @@ import EmptyState from '../ui/EmptyState'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatDate } from '../../utils/formatDate'
 import { PlanPeriodCell } from '../PlanPeriod'
+import { facilityStatus } from '../../utils/facility'
 import { Receipt } from 'lucide-react'
 
 export default function TransactionTable({ transactions, basePath = '/customer/transactions', showCustomer = false }) {
@@ -33,9 +34,21 @@ export default function TransactionTable({ transactions, basePath = '/customer/t
           <Td>{t.productName}</Td>
           <Td className="font-semibold">{formatCurrency(t.amount)}</Td>
           <Td>{formatDate(t.date)}</Td>
-          <Td><PlanPeriodCell transaction={t} /></Td>
           <Td>
-            <Badge status={t.status === 'draft' ? 'awaiting' : t.status}>{t.status === 'draft' ? 'Awaiting payment' : t.status}</Badge>
+            {t.facility ? (
+              <span className="text-xs text-navy-500 whitespace-nowrap">
+                {t.facility.nextRepayment ? `Next: ${formatCurrency(t.facility.nextRepayment.amount)} on ${formatDate(t.facility.nextRepayment.dueDate)}` : '—'}
+              </span>
+            ) : (
+              <PlanPeriodCell transaction={t} />
+            )}
+          </Td>
+          <Td>
+            {t.facility ? (
+              <Badge status={facilityStatus(t).badge} className="!normal-case whitespace-nowrap">{facilityStatus(t).label}</Badge>
+            ) : (
+              <Badge status={t.status === 'draft' ? 'awaiting' : t.status}>{t.status === 'draft' ? 'Awaiting payment' : t.status}</Badge>
+            )}
           </Td>
           <Td>
             <Link

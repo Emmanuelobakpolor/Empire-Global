@@ -1,7 +1,10 @@
 import { useRef, useState } from 'react'
-import { UploadCloud, CheckCircle2, FileText, X, User, Phone, MapPin, Hash } from 'lucide-react'
+import { UploadCloud, CheckCircle2, FileText, X, Phone, MapPin, Hash, Landmark, User } from 'lucide-react'
 import Input from '../ui/Input'
 import Select from '../ui/Select'
+import NameFields from '../ui/NameFields'
+import { joinName, nameErrors, splitName } from '../../utils/personName'
+import { NIGERIAN_BANKS } from '../../data/banks'
 
 // Which extra details each product type collects before final submission
 export const NEEDS_APPLICATION = ['loan', 'hire-purchase']
@@ -18,8 +21,21 @@ export const RELATIONSHIP_OPTIONS = ['Spouse', 'Parent', 'Sibling', 'Child', 'Re
 
 export const ID_TYPE_OPTIONS = ['NIN', 'Driver’s Licence', 'International Passport', 'Voter’s Card'].map((t) => ({ value: t, label: t }))
 
-export const EMPTY_GUARANTOR = { fullName: '', phone: '', address: '', relationship: '', idType: '', idNumber: '', idDocument: null }
-export const EMPTY_NEXT_OF_KIN = { fullName: '', phone: '', relationship: '', address: '' }
+// Forms hold first and last name separately; the API takes them together as fullName
+export const EMPTY_GUARANTOR = { firstName: '', lastName: '', phone: '', address: '', relationship: '', idType: '', idNumber: '', idDocument: null }
+export const EMPTY_NEXT_OF_KIN = { firstName: '', lastName: '', phone: '', relationship: '', address: '' }
+
+export function fromApiPerson(person) {
+  const { fullName, ...rest } = person || {}
+  return { ...rest, ...splitName(fullName) }
+}
+
+export function toApiPerson(person) {
+  const { firstName, lastName, ...rest } = person
+  return { ...rest, fullName: joinName({ firstName, lastName }) }
+}
+
+const personName = (p) => p?.fullName || joinName(p || {})
 
 const filled = (v) => typeof v === 'string' && v.trim().length > 0
 
@@ -40,8 +56,7 @@ export function itemErrors(item) {
 }
 
 export function guarantorErrors(g) {
-  const errs = {}
-  if (!filled(g.fullName)) errs.fullName = 'Full name is required.'
+  const errs = nameErrors(g)
   if (!filled(g.phone)) errs.phone = 'Phone number is required.'
   if (!filled(g.address)) errs.address = 'Address is required.'
   if (!g.relationship) errs.relationship = 'Relationship is required.'
@@ -52,8 +67,7 @@ export function guarantorErrors(g) {
 }
 
 export function nextOfKinErrors(n) {
-  const errs = {}
-  if (!filled(n?.fullName)) errs.fullName = 'Full name is required.'
+  const errs = nameErrors(n || {})
   if (!filled(n?.phone)) errs.phone = 'Phone number is required.'
   if (!n?.relationship) errs.relationship = 'Relationship is required.'
   if (!filled(n?.address)) errs.address = 'Address is required.'
@@ -160,8 +174,8 @@ export function GuarantorForm({ value, onChange, errors = {} }) {
   const set = (key) => (e) => onChange({ ...value, [key]: e.target.value })
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <Input label="Full Name" icon={User} value={value.fullName} onChange={set('fullName')} error={errors.fullName} required />
-      <Input label="Phone Number" icon={Phone} placeholder="+234 800 000 0000" value={value.phone} onChange={set('phone')} error={errors.phone} required />
+      <NameFields value={value} onChange={onChange} errors={errors} className="sm:col-span-2" />
+      <Input label="Phone Number" icon={Phone} placeholder="+234 800 000 0000" value={value.phone} onChange={set('phone')} error={errors.phone} containerClassName="sm:col-span-2" required />
       <Input label="Home Address" icon={MapPin} value={value.address} onChange={set('address')} error={errors.address} containerClassName="sm:col-span-2" required />
       <Select label="Relationship to You" placeholder="Choose relationship" value={value.relationship} onChange={set('relationship')} options={RELATIONSHIP_OPTIONS} error={errors.relationship} required />
       <Select label="ID Type" placeholder="Choose ID type" value={value.idType} onChange={set('idType')} options={ID_TYPE_OPTIONS} error={errors.idType} required />
@@ -179,11 +193,32 @@ export function GuarantorForm({ value, onChange, errors = {} }) {
   )
 }
 
+export const EMPTY_BANK_ACCOUNT = { bankName: '', accountNumber: '', accountName: '' }
+
+// The customer's own account: where a loan is paid out to
+export function BankAccountForm({ value, onChange, errors = {} }) {
+  const set = (key) => (e) => onChange({ ...value, [key]: key === 'accountNumber' ? e.target.value.replace(/\D/g, '').slice(0, 10) : e.target.value })
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <Input label="Bank Name" icon={Landmark} list="application-banks" value={value.bankName} onChange={set('bankName')} error={errors.bankName} required />
+      <datalist id="application-banks">{NIGERIAN_BANKS.map((b) => <option key={b} value={b} />)}</datalist>
+      <Input label="Account Number" icon={Hash} inputMode="numeric" placeholder="10 digits" value={value.accountNumber} onChange={set('accountNumber')} error={errors.accountNumber} required />
+      <Input label="Account Name" icon={User} value={value.accountName} onChange={set('accountName')} error={errors.accountName} hint="As it appears on the bank account." containerClassName="sm:col-span-2" required />
+    </div>
+  )
+}
+
+export const bankAccountRows = (a) => [
+  { label: 'Bank', value: a?.bankName },
+  { label: 'Account Number', value: a?.accountNumber },
+  { label: 'Account Name', value: a?.accountName },
+]
+
 export function NextOfKinForm({ value, onChange, errors = {} }) {
   const set = (key) => (e) => onChange({ ...value, [key]: e.target.value })
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <Input label="Full Name" icon={User} value={value.fullName} onChange={set('fullName')} error={errors.fullName} required />
+      <NameFields value={value} onChange={onChange} errors={errors} className="sm:col-span-2" />
       <Input label="Phone Number" icon={Phone} placeholder="+234 800 000 0000" value={value.phone} onChange={set('phone')} error={errors.phone} required />
       <Select label="Relationship" placeholder="Choose relationship" value={value.relationship} onChange={set('relationship')} options={RELATIONSHIP_OPTIONS} error={errors.relationship} required />
       <Input label="Address" icon={MapPin} value={value.address} onChange={set('address')} error={errors.address} required />
@@ -214,7 +249,7 @@ const fileValue = (doc) =>
   ) : doc.fileName)
 
 export const guarantorRows = (g) => [
-  { label: 'Full Name', value: g.fullName },
+  { label: 'Full Name', value: personName(g) },
   { label: 'Phone', value: g.phone },
   { label: 'Address', value: g.address },
   { label: 'Relationship', value: g.relationship },
@@ -223,7 +258,7 @@ export const guarantorRows = (g) => [
 ]
 
 export const nextOfKinRows = (n) => [
-  { label: 'Full Name', value: n.fullName },
+  { label: 'Full Name', value: personName(n) },
   { label: 'Phone', value: n.phone },
   { label: 'Relationship', value: n.relationship },
   { label: 'Address', value: n.address },

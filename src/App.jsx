@@ -52,6 +52,8 @@ import Payments from './pages/admin/Payments'
 import PaymentDetails from './pages/admin/PaymentDetails'
 import AdminTransactions from './pages/admin/AdminTransactions'
 import AdminTransactionDetails from './pages/admin/AdminTransactionDetails'
+import AdminFacilities from './pages/admin/AdminFacilities'
+import AdminFacilityDetails from './pages/admin/AdminFacilityDetails'
 import AdminProducts from './pages/admin/AdminProducts'
 import Reports from './pages/admin/Reports'
 import BankDetailsPage from './pages/admin/BankDetailsPage'
@@ -127,6 +129,8 @@ export default function App() {
                   <Route path="payments/:id" element={<PaymentDetails />} />
                   <Route path="transactions" element={<AdminTransactions />} />
                   <Route path="transactions/:id" element={<AdminTransactionDetails />} />
+                  <Route path="facilities" element={<AdminFacilities />} />
+                  <Route path="facilities/:id" element={<AdminFacilityDetails />} />
                   <Route path="products" element={<AdminProducts />} />
                   <Route path="reports" element={<Reports />} />
                   <Route path="bank-details" element={<BankDetailsPage />} />

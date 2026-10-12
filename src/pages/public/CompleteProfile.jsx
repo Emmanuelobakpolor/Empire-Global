@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { Mail, User, Phone, BadgeCheck, CheckCircle2 } from 'lucide-react'
+import { Mail, Phone, BadgeCheck, CheckCircle2 } from 'lucide-react'
 import AuthLayout from '../../components/AuthLayout'
 import Input from '../../components/ui/Input'
+import NameFields from '../../components/ui/NameFields'
+import { joinName, nameErrors, splitName, withNameErrors } from '../../utils/personName'
 import Button from '../../components/ui/Button'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
@@ -11,7 +13,8 @@ export default function CompleteProfile() {
   const { state } = useLocation()
   const googleProfile = state?.googleProfile
   const [form, setForm] = useState({
-    fullName: googleProfile?.fullName || '',
+    // Prefilled from the Google account; the customer confirms both parts
+    ...splitName(googleProfile?.fullName),
     phone: '',
     agentCode: '',
   })
@@ -27,8 +30,7 @@ export default function CompleteProfile() {
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
   const validate = () => {
-    const errs = {}
-    if (!form.fullName.trim()) errs.fullName = 'Full name is required.'
+    const errs = nameErrors(form)
     if (!form.phone.trim()) errs.phone = 'Phone number is required.'
     setErrors(errs)
     return Object.keys(errs).length === 0
@@ -38,7 +40,7 @@ export default function CompleteProfile() {
     e.preventDefault()
     if (!validate()) return
     setLoading(true)
-    const result = await completeGoogleSignup(form)
+    const result = await completeGoogleSignup({ ...form, fullName: joinName(form) })
     setLoading(false)
     if (result.success) {
       showToast('Account created successfully! Welcome to Empire Global.', 'success')
@@ -47,7 +49,7 @@ export default function CompleteProfile() {
       showToast(result.error, 'error')
       navigate('/register', { replace: true })
     } else if (Object.keys(result.fieldErrors).length) {
-      setErrors(result.fieldErrors)
+      setErrors(withNameErrors(result.fieldErrors))
     } else {
       showToast(result.error, 'error')
     }
@@ -72,15 +74,7 @@ export default function CompleteProfile() {
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <Input
-          label="Full Name"
-          icon={User}
-          placeholder="e.g. Adewale Alao"
-          value={form.fullName}
-          onChange={update('fullName')}
-          error={errors.fullName}
-          required
-        />
+        <NameFields value={form} onChange={(name) => setForm((f) => ({ ...f, ...name }))} errors={errors} />
         <Input
           label="Email Address"
           type="email"

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User, Mail, Phone, Lock, LogOut, ShieldCheck, Calendar, BadgeCheck, Copy, Check } from 'lucide-react'
+import { Mail, Phone, Lock, LogOut, ShieldCheck, Calendar, BadgeCheck, Copy, Check } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
@@ -12,7 +12,9 @@ import ChangeEmailModal from '../../components/customer/ChangeEmailModal'
 import AvatarUploader from '../../components/ui/AvatarUploader'
 import { useAuth } from '../../context/AuthContext'
 import { useDataStore } from '../../context/DataStoreContext'
-import { NextOfKinForm, EMPTY_NEXT_OF_KIN, nextOfKinErrors } from '../../components/customer/ApplicationForms'
+import { NextOfKinForm, EMPTY_NEXT_OF_KIN, nextOfKinErrors, fromApiPerson, toApiPerson } from '../../components/customer/ApplicationForms'
+import NameFields from '../../components/ui/NameFields'
+import { joinName, nameErrors, splitName, withNameErrors } from '../../utils/personName'
 import { useToast } from '../../context/ToastContext'
 import { formatDate } from '../../utils/formatDate'
 import { copyText } from '../../utils/clipboard'
@@ -22,7 +24,8 @@ export default function Profile() {
   const { showToast } = useToast()
   const navigate = useNavigate()
 
-  const [form, setForm] = useState({ fullName: user?.fullName || '', phone: user?.phone || '' })
+  const [form, setForm] = useState({ ...splitName(user?.fullName), phone: user?.phone || '' })
+  const [formErrors, setFormErrors] = useState({})
   const [emailOpen, setEmailOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
@@ -44,17 +47,23 @@ export default function Profile() {
 
   const { customers, updateCustomer } = useDataStore()
   const savedNextOfKin = customers.find((c) => c.id === user?.id)?.nextOfKin || user?.nextOfKin
-  const [nextOfKin, setNextOfKin] = useState(savedNextOfKin || EMPTY_NEXT_OF_KIN)
+  const [nextOfKin, setNextOfKin] = useState(savedNextOfKin ? fromApiPerson(savedNextOfKin) : EMPTY_NEXT_OF_KIN)
   const [nokErrors, setNokErrors] = useState({})
   const [savingNok, setSavingNok] = useState(false)
 
   const handleSave = async (e) => {
     e.preventDefault()
+    const errs = nameErrors(form)
+    setFormErrors(errs)
+    if (Object.keys(errs).length) return
     setSaving(true)
-    const result = await updateProfile({ fullName: form.fullName, phone: form.phone })
+    const result = await updateProfile({ fullName: joinName(form), phone: form.phone })
     setSaving(false)
     if (result.success) showToast('Profile updated successfully.', 'success')
-    else showToast(result.error, 'error')
+    else {
+      setFormErrors(withNameErrors(result.fieldErrors))
+      showToast(result.error, 'error')
+    }
   }
 
   const handleSaveNextOfKin = async (e) => {
@@ -63,7 +72,7 @@ export default function Profile() {
     setNokErrors(errs)
     if (Object.keys(errs).length) return
     setSavingNok(true)
-    const result = await updateProfile({ nextOfKin })
+    const result = await updateProfile({ nextOfKin: toApiPerson(nextOfKin) })
     setSavingNok(false)
     if (!result.success) {
       showToast(result.error, 'error')
@@ -116,7 +125,7 @@ export default function Profile() {
           <Card>
             <h3 className="text-sm font-bold text-navy-800 mb-5">Personal Information</h3>
             <form onSubmit={handleSave} className="flex flex-col gap-4">
-              <Input label="Full Name" icon={User} value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
+              <NameFields value={form} onChange={(name) => setForm({ ...form, ...name })} errors={formErrors} />
               <div className="flex items-end gap-2">
                 <Input label="Email" icon={Mail} type="email" value={user?.email || ''} readOnly disabled containerClassName="flex-1" />
                 <Button variant="outline" onClick={() => setEmailOpen(true)} className="shrink-0">Change</Button>

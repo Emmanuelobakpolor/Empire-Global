@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, UserPlus, Pencil, Trash2, Power, User, Mail, Lock, ShieldCheck } from 'lucide-react'
+import { Search, UserPlus, Pencil, Trash2, Power, Mail, Lock, ShieldCheck } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
@@ -9,6 +9,8 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import Table, { Tr, Td } from '../../components/ui/Table'
 import Badge from '../../components/ui/Badge'
 import Avatar from '../../components/ui/Avatar'
+import NameFields from '../../components/ui/NameFields'
+import { joinName, nameErrors, splitName, withNameErrors } from '../../utils/personName'
 import LoadingState from '../../components/ui/LoadingState'
 import { useDataStore } from '../../context/DataStoreContext'
 import { useAdminAuth } from '../../context/AdminAuthContext'
@@ -21,7 +23,7 @@ const ROLE_OPTIONS = [
   { value: ROLES.SUPER_ADMIN, label: 'Super Admin — final approval and admin management' },
 ]
 
-const EMPTY_FORM = { fullName: '', email: '', role: ROLES.ADMIN, password: '' }
+const EMPTY_FORM = { firstName: '', lastName: '', email: '', role: ROLES.ADMIN, password: '' }
 
 export default function AdminManagement() {
   const { admins, refreshAdmins, createAdmin, updateAdmin, toggleAdminStatus, deleteAdmin } = useDataStore()
@@ -60,7 +62,7 @@ export default function AdminManagement() {
   }
 
   const openEdit = (a) => {
-    setForm({ fullName: a.fullName, email: a.email, role: a.role, password: '' })
+    setForm({ ...splitName(a.fullName), email: a.email, role: a.role, password: '' })
     setErrors({})
     setEditing(a)
   }
@@ -68,8 +70,7 @@ export default function AdminManagement() {
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
   const handleSave = async () => {
-    const errs = {}
-    if (!form.fullName.trim()) errs.fullName = 'Full name is required.'
+    const errs = nameErrors(form)
     if (!form.email.trim()) errs.email = 'Email is required.'
     if (isNew && !form.password) errs.password = 'A temporary password is required.'
     if (form.password && form.password.length < 8) errs.password = 'Password must be at least 8 characters.'
@@ -77,11 +78,12 @@ export default function AdminManagement() {
     if (Object.keys(errs).length) return
 
     setBusy(true)
-    const result = isNew ? await createAdmin(form) : await updateAdmin(editing.id, form)
+    const data = { ...form, fullName: joinName(form) }
+    const result = isNew ? await createAdmin(data) : await updateAdmin(editing.id, data)
     setBusy(false)
     if (!result.success) {
       // The server checks for duplicate emails and weak passwords
-      if (Object.keys(result.fieldErrors).length) setErrors(result.fieldErrors)
+      if (Object.keys(result.fieldErrors).length) setErrors(withNameErrors(result.fieldErrors))
       else showToast(result.error, 'error')
       return
     }
@@ -186,7 +188,7 @@ export default function AdminManagement() {
         }
       >
         <div className="flex flex-col gap-4">
-          <Input label="Full Name" icon={User} value={form.fullName} onChange={update('fullName')} error={errors.fullName} required />
+          <NameFields value={form} onChange={(name) => setForm((f) => ({ ...f, ...name }))} errors={errors} />
           <Input label="Email" type="email" icon={Mail} value={form.email} onChange={update('email')} error={errors.email} required />
           <Select
             label="Role"

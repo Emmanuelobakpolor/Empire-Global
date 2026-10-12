@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Mail, Lock, User, Phone, BadgeCheck } from 'lucide-react'
+import { Mail, Lock, Phone, BadgeCheck } from 'lucide-react'
 import AuthLayout from '../../components/AuthLayout'
 import Input from '../../components/ui/Input'
+import NameFields from '../../components/ui/NameFields'
+import { joinName, nameErrors, withNameErrors } from '../../utils/personName'
 import Button from '../../components/ui/Button'
 import GoogleAuthButton, { AuthDivider } from '../../components/GoogleAuthButton'
 import { useAuth } from '../../context/AuthContext'
@@ -10,7 +12,7 @@ import { useGoogleAvailable } from '../../utils/googleAuth'
 import { useToast } from '../../context/ToastContext'
 
 export default function Register() {
-  const [form, setForm] = useState({ fullName: '', email: '', phone: '', agentCode: '', password: '', confirmPassword: '' })
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', agentCode: '', password: '', confirmPassword: '' })
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
@@ -22,8 +24,7 @@ export default function Register() {
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
   const validate = () => {
-    const errs = {}
-    if (!form.fullName.trim()) errs.fullName = 'Full name is required.'
+    const errs = nameErrors(form)
     if (!form.email.trim()) errs.email = 'Email is required.'
     if (!form.phone.trim()) errs.phone = 'Phone number is required.'
     if (!form.password) errs.password = 'Password is required.'
@@ -37,14 +38,14 @@ export default function Register() {
     e.preventDefault()
     if (!validate()) return
     setLoading(true)
-    const result = await startRegistration(form)
+    const result = await startRegistration({ ...form, fullName: joinName(form) })
     setLoading(false)
     if (result.success) {
       showToast(`We sent a verification code to ${result.email}.`, 'info')
       navigate('/verify-email')
     } else if (Object.keys(result.fieldErrors).length) {
       // The server checks password strength and existing accounts
-      setErrors(result.fieldErrors)
+      setErrors(withNameErrors(result.fieldErrors))
     } else {
       showToast(result.error, 'error')
     }
@@ -88,15 +89,7 @@ export default function Register() {
       )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <Input
-          label="Full Name"
-          icon={User}
-          placeholder="e.g. Adewale Alao"
-          value={form.fullName}
-          onChange={update('fullName')}
-          error={errors.fullName}
-          required
-        />
+        <NameFields value={form} onChange={(name) => setForm((f) => ({ ...f, ...name }))} errors={errors} />
         <Input
           label="Email Address"
           type="email"

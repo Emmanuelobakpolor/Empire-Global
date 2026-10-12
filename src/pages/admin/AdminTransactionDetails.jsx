@@ -63,7 +63,12 @@ export default function AdminTransactionDetails() {
           </div>
         </div>
 
-        {(transaction.status === 'pending' || transaction.status === 'processing') && (
+        {transaction.facility && (
+          <Link to={`/admin/facilities/${transaction.id}`} className="inline-block mt-5">
+            <Button variant="accent" size="sm">Open in Loans & Hire-Purchase</Button>
+          </Link>
+        )}
+        {!transaction.facility && (transaction.status === 'pending' || transaction.status === 'processing') && (
           <Link to={`/admin/payments/${transaction.id}`} className="inline-block mt-5">
             <Button variant="accent" size="sm">Go to Payment Verification</Button>
           </Link>

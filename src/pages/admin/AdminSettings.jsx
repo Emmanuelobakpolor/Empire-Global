@@ -7,6 +7,8 @@ import Select from '../../components/ui/Select'
 import Button from '../../components/ui/Button'
 import LoadingState from '../../components/ui/LoadingState'
 import AvatarUploader from '../../components/ui/AvatarUploader'
+import NameFields from '../../components/ui/NameFields'
+import { joinName, nameErrors, splitName, withNameErrors } from '../../utils/personName'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useToast } from '../../context/ToastContext'
 import { setCachedPlatformSettings } from '../../hooks/usePlatformSettings'
@@ -151,24 +153,24 @@ function GeneralSettings() {
 function ProfileSettings() {
   const { admin, updateProfile } = useAdminAuth()
   const { showToast } = useToast()
-  const [fullName, setFullName] = useState(admin?.fullName || '')
-  const [error, setError] = useState('')
+  const [name, setName] = useState(splitName(admin?.fullName))
+  const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!fullName.trim()) {
-      setError('Full name is required.')
-      return
-    }
+    const errs = nameErrors(name)
+    setErrors(errs)
+    if (Object.keys(errs).length) return
     setSaving(true)
-    const result = await updateProfile({ fullName })
+    const result = await updateProfile({ fullName: joinName(name) })
     setSaving(false)
     if (!result.success) {
-      setError(result.fieldErrors.fullName || result.error)
+      const fieldErrs = withNameErrors(result.fieldErrors)
+      setErrors(Object.keys(fieldErrs).length ? fieldErrs : { firstName: result.error })
       return
     }
-    setError('')
+    setErrors({})
     showToast('Profile updated.', 'success')
   }
 
@@ -182,13 +184,13 @@ function ProfileSettings() {
           <p className="text-xs text-navy-400">JPG, PNG or WebP, up to 5 MB. Shown in the top bar and to other admins.</p>
         </div>
       </div>
-      <Input label="Full Name" icon={User} value={fullName} onChange={(e) => setFullName(e.target.value)} error={error} required />
+      <NameFields value={name} onChange={setName} errors={errors} />
       <Input label="Email" icon={Mail} value={admin?.email || ''} disabled hint="Ask a Super Admin to change your email." />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Input label="Role" icon={Shield} value={admin?.role || ''} disabled />
         <Input label="Admin ID" icon={BadgeCheck} value={admin?.id || ''} disabled />
       </div>
-      <SaveBar saving={saving} disabled={fullName.trim() === admin?.fullName} />
+      <SaveBar saving={saving} disabled={joinName(name) === admin?.fullName} />
     </form>
   )
 }

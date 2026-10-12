@@ -20,6 +20,7 @@ const EMPTY_FORM = {
   clauses: '',
   requirements: '',
   itemCategories: [],
+  interestRate: '',
   status: 'active',
 }
 
@@ -66,6 +67,7 @@ export default function ProductFormModal({ open, onClose, onSave, initialData })
               clauses: toLines(initialData.clauses),
               requirements: toLines(initialData.requirements),
               itemCategories: initialData.itemCategories || [],
+              interestRate: initialData.interestRate ?? '',
             }
           : EMPTY_FORM
       )
@@ -75,6 +77,7 @@ export default function ProductFormModal({ open, onClose, onSave, initialData })
 
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
   const isHirePurchase = form.type === 'hire-purchase'
+  const isFacility = isHirePurchase || form.type === 'loan'
 
   const toggleItemCategory = (value) =>
     setForm((f) => ({
@@ -117,6 +120,8 @@ export default function ProductFormModal({ open, onClose, onSave, initialData })
       clauses: fromLines(form.clauses),
       requirements: fromLines(form.requirements),
       itemCategories: isHirePurchase ? form.itemCategories : [],
+      // Blank: a Super Admin sets the rate when approving each application
+      interestRate: isFacility && form.interestRate !== '' ? Number(form.interestRate) : null,
     })
     setSaving(false)
     // The server checks limits and lists too; show anything it rejects on the form
@@ -157,6 +162,18 @@ export default function ProductFormModal({ open, onClose, onSave, initialData })
         />
         <Input label="Payment Frequency" placeholder="e.g. Daily or Weekly" value={form.frequency} onChange={update('frequency')} error={errors.frequency} hint="Separate options with commas or “or”." />
 
+        {isFacility && (
+          <Input
+            label="Interest Rate (% per month, flat)"
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.interestRate}
+            onChange={update('interestRate')}
+            error={errors.interestRate}
+            hint="Leave blank to set it on each application when approving (e.g. when the item decides the rate)."
+          />
+        )}
         {isHirePurchase && (
           <div className="sm:col-span-2">
             <p className="text-sm font-medium text-navy-700 mb-1.5">Eligible Items</p>

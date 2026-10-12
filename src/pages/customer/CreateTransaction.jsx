@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Check, ShieldCheck, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Check, ShieldCheck, Users, Landmark, Info } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -9,10 +9,12 @@ import Select from '../../components/ui/Select'
 import Stepper from '../../components/ui/Stepper'
 import { PRODUCT_ICONS, PRODUCT_COLORS } from '../../components/customer/ProductCard'
 import {
-  NEEDS_APPLICATION, NEEDS_NEXT_OF_KIN, EMPTY_GUARANTOR, EMPTY_NEXT_OF_KIN,
-  DocumentsForm, GuarantorForm, NextOfKinForm, ItemForm, DetailList, itemErrors, itemRows,
-  documentsComplete, guarantorErrors, nextOfKinErrors, guarantorRows, nextOfKinRows, documentRows,
+  NEEDS_APPLICATION, NEEDS_NEXT_OF_KIN, EMPTY_GUARANTOR, EMPTY_NEXT_OF_KIN, EMPTY_BANK_ACCOUNT,
+  DocumentsForm, GuarantorForm, NextOfKinForm, ItemForm, BankAccountForm, DetailList, itemErrors, itemRows,
+  documentsComplete, guarantorErrors, nextOfKinErrors, guarantorRows, nextOfKinRows, documentRows, bankAccountRows,
+  fromApiPerson, toApiPerson,
 } from '../../components/customer/ApplicationForms'
+import { bankAccountErrors, estimateRepayment, frequencyLabel } from '../../utils/facility'
 import { useDataStore } from '../../context/DataStoreContext'
 import GeneratingTransaction, { GENERATING_MS } from '../../components/customer/GeneratingTransaction'
 import { useAuth } from '../../context/AuthContext'
@@ -29,9 +31,33 @@ const STEP_LABELS = {
   item: 'Item',
   documents: 'Documents',
   guarantor: 'Guarantor',
+  account: 'Bank Account',
   nextOfKin: 'Next of Kin',
   review: 'Review',
   done: 'Generated',
+}
+
+// What the customer can expect to repay, when the product has a set rate
+function RepaymentEstimate({ estimate, frequency }) {
+  if (!frequency) return null
+  if (!estimate) {
+    return (
+      <p className="flex items-start gap-2 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        <Info size={16} className="mt-0.5 shrink-0" />
+        Your interest rate depends on what you’re financing. It’s confirmed when your application is approved, before anything is paid out.
+      </p>
+    )
+  }
+  return (
+    <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 text-sm text-navy-700">
+      <p>
+        About <strong className="text-navy-900">{formatCurrency(estimate.each)}</strong>{' '}
+        {estimate.count === 1 ? 'once' : `${frequencyLabel(frequency).toLowerCase()} for ${estimate.count} instalments`},{' '}
+        <strong className="text-navy-900">{formatCurrency(estimate.total)}</strong> in total.
+      </p>
+      <p className="text-xs text-navy-400 mt-1">An estimate. Your exact schedule is set when you receive the funds or item.</p>
+    </div>
+  )
 }
 
 export default function CreateTransaction() {
@@ -54,9 +80,12 @@ export default function CreateTransaction() {
   const [guarantor, setGuarantor] = useState(EMPTY_GUARANTOR)
   const [item, setItem] = useState({ category: '', description: '' })
   const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [repaymentFrequency, setRepaymentFrequency] = useState('')
+  // The customer's own account, where a loan is paid out to
+  const [bankAccount, setBankAccount] = useState({ ...EMPTY_BANK_ACCOUNT, accountName: user?.fullName || '' })
   // Savings / investment next of kin, pre-filled from the customer's profile
   const savedNextOfKin = customers.find((c) => c.id === user?.id)?.nextOfKin || user?.nextOfKin
-  const [nextOfKin, setNextOfKin] = useState(savedNextOfKin || EMPTY_NEXT_OF_KIN)
+  const [nextOfKin, setNextOfKin] = useState(savedNextOfKin ? fromApiPerson(savedNextOfKin) : EMPTY_NEXT_OF_KIN)
   const [saveNextOfKin, setSaveNextOfKin] = useState(true)
   const [errors, setErrors] = useState({})
 
@@ -66,6 +95,10 @@ export default function CreateTransaction() {
   const isHirePurchase = product?.type === 'hire-purchase'
   const hasClauses = product?.clauses?.length > 0
   const termOptions = product?.termOptions || []
+  const repaymentOptions = product?.repaymentFrequencies || []
+  // Products with one way to repay (e.g. a salary advance on payday) don't ask
+  const chosenFrequency = repaymentOptions.length === 1 ? repaymentOptions[0] : repaymentFrequency
+  const estimate = needsApplication ? estimateRepayment(Number(amount), product?.interestRate, termOptions.length > 1 ? termMonths : termOptions[0], chosenFrequency) : null
   // Single-option products have a fixed term; null termOptions means open-ended
   const chosenTerm = termOptions.length > 1 ? termMonths : termOptions[0] ?? null
   const today = new Date().toISOString().slice(0, 10)
@@ -76,7 +109,7 @@ export default function CreateTransaction() {
     'amount',
     'plan',
     ...(isHirePurchase ? ['item'] : []),
-    ...(needsApplication ? ['documents', 'guarantor'] : []),
+    ...(needsApplication ? ['documents', 'guarantor', 'account'] : []),
     ...(needsNextOfKin ? ['nextOfKin'] : []),
     'review',
     'done',
@@ -93,6 +126,7 @@ export default function CreateTransaction() {
     setAcceptedTerms(false)
     setItem({ category: '', description: '' })
     setTermMonths(null)
+    setRepaymentFrequency('')
   }, [productId])
 
   const canGoNext = () => {
@@ -101,7 +135,7 @@ export default function CreateTransaction() {
       const num = Number(amount)
       return num > 0 && (!product || (num >= product.minAmount && num <= product.maxAmount))
     }
-    if (current === 'plan') return !!planFrequency && (termOptions.length <= 1 || !!termMonths)
+    if (current === 'plan') return (needsApplication ? !!chosenFrequency : !!planFrequency) && (termOptions.length <= 1 || !!termMonths)
     if (current === 'documents') return documentsComplete(documents, product)
     if (current === 'review' && hasClauses) return acceptedTerms
     return true
@@ -117,25 +151,30 @@ export default function CreateTransaction() {
     const files = needsApplication
       ? { ...Object.fromEntries(Object.entries(documents).map(([key, doc]) => [key, doc?.file])), guarantorId: idDocument?.file }
       : {}
+    const apiNextOfKin = needsNextOfKin ? toApiPerson(nextOfKin) : null
     const result = await createTransaction({
       productId: product.id,
       amount: Number(amount),
       termMonths: chosenTerm,
       termsAccepted: hasClauses ? acceptedTerms : false,
-      ...(needsApplication && { application: { guarantor: guarantorDetails, ...(isHirePurchase && { item }) } }),
-      ...(needsNextOfKin && { nextOfKin }),
+      ...(needsApplication && {
+        application: { guarantor: toApiPerson(guarantorDetails), ...(isHirePurchase && { item }) },
+        repaymentFrequency: chosenFrequency,
+        disbursementAccount: { ...bankAccount, bankName: bankAccount.bankName.trim(), accountName: bankAccount.accountName.trim() },
+      }),
+      ...(needsNextOfKin && { nextOfKin: apiNextOfKin }),
     }, files)
     if (!result.success) {
       // Errors show straight away, without waiting for the animation to finish
       setSubmitting(false)
       // e.g. a document the server couldn't read, or an amount outside the product's limits
-      const documentErrors = result.data?.documents
-      showToast(Array.isArray(documentErrors) ? documentErrors[0] : result.error, 'error')
+      const listErrors = result.data?.documents || result.data?.disbursementAccount
+      showToast(Array.isArray(listErrors) ? listErrors[0] : result.error, 'error')
       return false
     }
     if (needsNextOfKin && saveNextOfKin) {
-      updateCustomer(user.id, { nextOfKin })
-      updateProfile({ nextOfKin }).then((saved) => {
+      updateCustomer(user.id, { nextOfKin: apiNextOfKin })
+      updateProfile({ nextOfKin: apiNextOfKin }).then((saved) => {
         if (!saved.success) showToast(`Next of kin wasn't saved to your profile: ${saved.error}`, 'error')
       })
     }
@@ -153,6 +192,7 @@ export default function CreateTransaction() {
       current === 'item' ? itemErrors(item)
         : current === 'guarantor' ? guarantorErrors(guarantor)
         : current === 'nextOfKin' ? nextOfKinErrors(nextOfKin)
+        : current === 'account' ? bankAccountErrors(bankAccount)
         : {}
     setErrors(stepErrors)
     if (Object.keys(stepErrors).length) return
@@ -222,16 +262,37 @@ export default function CreateTransaction() {
 
         {current === 'plan' && product && (
           <div>
-            <h3 className="text-base font-bold text-navy-900 mb-1">Select Plan</h3>
-            <p className="text-sm text-navy-400 mb-5">Choose your payment frequency and how long the plan should run.</p>
+            <h3 className="text-base font-bold text-navy-900 mb-1">{needsApplication ? 'Repayment Plan' : 'Select Plan'}</h3>
+            <p className="text-sm text-navy-400 mb-5">
+              {needsApplication
+                ? 'Choose how often you’ll repay and over how long. Repayments start when the '
+                  + (isHirePurchase ? 'item is delivered.' : 'loan is paid into your account.')
+                : 'Choose your payment frequency and how long the plan should run.'}
+            </p>
             <div className="flex flex-col gap-4">
-              <Select
-                label="Payment Frequency"
-                value={planFrequency}
-                onChange={(e) => setPlanFrequency(e.target.value)}
-                options={product.frequency.split(/,| or /).filter(Boolean).map((f) => ({ value: f.trim(), label: f.trim() }))}
-                placeholder="Choose a frequency"
-              />
+              {needsApplication ? (
+                repaymentOptions.length > 1 ? (
+                  <Select
+                    label="Repayment Frequency"
+                    value={repaymentFrequency}
+                    onChange={(e) => setRepaymentFrequency(e.target.value)}
+                    options={repaymentOptions.map((f) => ({ value: f, label: frequencyLabel(f) }))}
+                    placeholder="Choose how often you'll repay"
+                  />
+                ) : (
+                  <div className="rounded-xl bg-navy-50/60 px-4 py-3 text-sm text-navy-600">
+                    Repayment: <strong className="text-navy-900">{frequencyLabel(chosenFrequency)}</strong>
+                  </div>
+                )
+              ) : (
+                <Select
+                  label="Payment Frequency"
+                  value={planFrequency}
+                  onChange={(e) => setPlanFrequency(e.target.value)}
+                  options={product.frequency.split(/,| or /).filter(Boolean).map((f) => ({ value: f.trim(), label: f.trim() }))}
+                  placeholder="Choose a frequency"
+                />
+              )}
               {termOptions.length > 1 ? (
                 <Select
                   label="Plan Duration"
@@ -245,7 +306,8 @@ export default function CreateTransaction() {
                   Plan duration: <strong className="text-navy-900">{termOptions.length ? formatTerm(termOptions[0]) : 'Open-ended (no expiry date)'}</strong>
                 </div>
               )}
-              {period?.end && (
+              {needsApplication && <RepaymentEstimate estimate={estimate} frequency={chosenFrequency} />}
+              {period?.end && !needsApplication && (
                 <p className="text-sm text-navy-500">
                   Runs from <strong className="text-navy-900">{formatDate(period.start)}</strong> to{' '}
                   <strong className="text-navy-900">{formatDate(period.end)}</strong>.
@@ -288,6 +350,20 @@ export default function CreateTransaction() {
           </div>
         )}
 
+        {current === 'account' && (
+          <div>
+            <h3 className="text-base font-bold text-navy-900 mb-1 flex items-center gap-2">
+              <Landmark size={18} className="text-emerald-500" /> Your Bank Account
+            </h3>
+            <p className="text-sm text-navy-400 mb-5">
+              {isHirePurchase
+                ? 'Your own account, kept on your application for refunds and to match your repayments.'
+                : 'Where we’ll pay your loan once it’s approved. It must be in your name.'}
+            </p>
+            <BankAccountForm value={bankAccount} onChange={setBankAccount} errors={errors} />
+          </div>
+        )}
+
         {current === 'nextOfKin' && (
           <div>
             <h3 className="text-base font-bold text-navy-900 mb-1 flex items-center gap-2">
@@ -318,7 +394,16 @@ export default function CreateTransaction() {
               Please confirm the details below before {needsApplication ? 'submitting your application' : 'generating your transaction reference'}.
             </p>
             <DetailList
-              rows={[
+              rows={needsApplication ? [
+                { label: 'Product', value: product.name },
+                { label: 'Type', value: productTypes.find((t) => t.value === product.type)?.label },
+                { label: isHirePurchase ? 'Item Value' : 'Loan Amount', value: formatCurrency(Number(amount)) },
+                { label: 'Repayment', value: frequencyLabel(chosenFrequency) },
+                { label: 'Duration', value: formatTerm(chosenTerm) },
+                { label: 'Interest', value: product.interestRate != null ? `${product.interestRate}% a month (flat)` : 'Set on approval' },
+                ...(estimate ? [{ label: 'Estimated Total to Repay', value: formatCurrency(estimate.total) }] : []),
+                { label: 'Customer', value: user?.fullName },
+              ] : [
                 { label: 'Product', value: product.name },
                 { label: 'Type', value: productTypes.find((t) => t.value === product.type)?.label },
                 { label: 'Amount', value: formatCurrency(Number(amount)) },
@@ -331,6 +416,8 @@ export default function CreateTransaction() {
             />
             {needsApplication && (
               <>
+                <p className="text-xs font-bold uppercase tracking-wider text-navy-400 mt-6 mb-2">Your Bank Account</p>
+                <DetailList rows={bankAccountRows(bankAccount)} />
                 {isHirePurchase && (
                   <>
                     <p className="text-xs font-bold uppercase tracking-wider text-navy-400 mt-6 mb-2">Item</p>
@@ -380,17 +467,25 @@ export default function CreateTransaction() {
               </span>
             </div>
             <h3 className="text-lg font-bold text-navy-900">{needsApplication ? 'Application Submitted' : 'Transaction Reference Generated'}</h3>
-            <p className="text-sm text-navy-400 mt-1">Your transaction has been created successfully.</p>
+            <p className="text-sm text-navy-400 mt-1">
+              {needsApplication
+                ? 'We’ll review your application and notify you. There’s nothing to pay now.'
+                : 'Your transaction has been created successfully.'}
+            </p>
             <div className="bg-navy-900 rounded-xl px-6 py-4 mt-5 w-full">
               <p className="text-xs text-navy-300">Transaction Reference</p>
               <p className="text-lg font-mono font-bold text-emerald-400 mt-1 tracking-wide animate-reference-reveal">{reference}</p>
             </div>
             <div className="grid grid-cols-3 gap-3 w-full mt-3 text-left stagger-pop">
-              {[
+              {(needsApplication ? [
+                { label: 'Amount', value: formatCurrency(Number(amount)) },
+                { label: 'Duration', value: formatTerm(chosenTerm) },
+                { label: 'Repayment', value: frequencyLabel(chosenFrequency) },
+              ] : [
                 { label: 'Start Date', value: formatDate(period.start) },
                 { label: 'End Date', value: period.end ? formatDate(period.end) : 'No expiry' },
                 { label: 'Duration', value: formatTerm(chosenTerm) },
-              ].map((row) => (
+              ]).map((row) => (
                 <div key={row.label} className="rounded-xl border border-navy-100 px-3 py-2.5">
                   <p className="text-[11px] text-navy-400">{row.label}</p>
                   <p className="text-sm font-bold text-navy-900 mt-0.5">{row.value}</p>
@@ -401,9 +496,9 @@ export default function CreateTransaction() {
               className="mt-6"
               fullWidth
               size="lg"
-              onClick={() => navigate(`/customer/payment?ref=${reference}`)}
+              onClick={() => navigate(needsApplication ? `/customer/transactions/${reference}` : `/customer/payment?ref=${reference}`)}
             >
-              Continue to Payment Instructions
+              {needsApplication ? 'View My Application' : 'Continue to Payment Instructions'}
             </Button>
           </div>
         )}
