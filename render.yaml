@@ -12,11 +12,14 @@ services:
     rootDir: backend
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
     # Migrations also load the product catalogue and the collection bank accounts.
-    # Abandoned sign-ups are cleared on every start (free instances restart often).
+    # Abandoned sign-ups are cleared, and loan / hire-purchase repayment reminders sent, on every
+    # start (free instances restart often). Each instalment is only reminded once, so repeats are safe.
+    # On a paid plan the instance rarely restarts: move the reminders to a daily Render Cron Job then.
     startCommand: >-
       python manage.py migrate --noinput &&
       python manage.py createcachetable &&
       python manage.py purge_pending_signups &&
+      python manage.py send_repayment_reminders &&
       gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60
     envVars:
       - key: PYTHON_VERSION
