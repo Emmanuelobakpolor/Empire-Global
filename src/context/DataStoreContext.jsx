@@ -169,7 +169,7 @@ export function DataStoreProvider({ children }) {
   const recommendPayment = (transactionId, decision, note) =>
     reviewAction(transactionId, 'recommend', { decision, note: note || '' })
 
-  // interestRate: loan and hire-purchase applications only (the product's rate when omitted)
+  // interestRate: loan and hire-purchase applications, and investments (the product's rate when omitted)
   const approvePayment = async (transactionId, note, interestRate) => {
     if (!isSuperAdmin()) return { success: false, error: 'Only a Super Admin can give final approval.' }
     const body = { note: note || '', ...(interestRate !== undefined && interestRate !== '' && { interestRate: Number(interestRate) }) }
@@ -189,6 +189,24 @@ export function DataStoreProvider({ children }) {
   const disburseFacility = async (transactionId, reference) => {
     const result = await reviewAction(transactionId, 'disburse', { reference })
     if (result.success) refreshCustomers()
+    return result
+  }
+
+  // A Super Admin re-prices an approved loan or hire-purchase; the server spreads the change over unpaid instalments
+  const changeInterestRate = async (transactionId, interestRate, note) => {
+    if (!isSuperAdmin()) return { success: false, error: 'Only a Super Admin can change the interest rate.' }
+    const result = await reviewAction(transactionId, 'interest-rate', { interestRate: Number(interestRate), note: note || '' })
+    if (result.success) refreshCustomers()
+    return result
+  }
+
+  // ---- Investment interest ----
+  // Admins send each payment by bank transfer as it comes due, then record the transfer reference
+  const getInterestPayments = () => call('/admin/interest-payments/')
+
+  const recordInterestPayment = async (paymentId, reference) => {
+    const result = await call(`/admin/interest-payments/${paymentId}/pay/`, { method: 'POST', body: { reference } }, { audited: true })
+    if (result.success) replaceTransaction(result.transaction)
     return result
   }
 
@@ -499,6 +517,9 @@ export function DataStoreProvider({ children }) {
     approvePayment,
     rejectPayment,
     disburseFacility,
+    changeInterestRate,
+    getInterestPayments,
+    recordInterestPayment,
     uploadRepaymentReceipt,
     repaymentAction,
     refreshWithdrawals,

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ChevronLeft, FileText, User, Calendar, Hash } from 'lucide-react'
 import Card from '../../components/ui/Card'
@@ -9,6 +10,8 @@ import ReceiptPreview from '../../components/ReceiptPreview'
 import TransactionTimeline from '../../components/customer/TransactionTimeline'
 import ApplicationDetails from '../../components/admin/ApplicationDetails'
 import PlanPeriodCard from '../../components/PlanPeriod'
+import InvestmentPanel from '../../components/customer/InvestmentPanel'
+import RecordInterestModal from '../../components/admin/RecordInterestModal'
 import { useDataStore } from '../../context/DataStoreContext'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatDate } from '../../utils/formatDate'
@@ -18,6 +21,7 @@ export default function AdminTransactionDetails() {
   const navigate = useNavigate()
   const { transactions, transactionsLoaded } = useDataStore()
   const transaction = transactions.find((t) => t.id === id)
+  const [recording, setRecording] = useState(null)
 
   if (!transaction && !transactionsLoaded) return <LoadingState label="Loading transaction..." />
 
@@ -77,6 +81,8 @@ export default function AdminTransactionDetails() {
 
       <PlanPeriodCard transaction={transaction} />
 
+      {transaction.investment && <InvestmentPanel transaction={transaction} onRecord={setRecording} />}
+
       {transaction.receipt && (
         <Card className="mb-6">
           <h3 className="text-sm font-bold text-navy-800 mb-4">Payment Receipt</h3>
@@ -90,6 +96,13 @@ export default function AdminTransactionDetails() {
         <h3 className="text-sm font-bold text-navy-800 mb-5">Transaction Timeline</h3>
         <TransactionTimeline steps={transaction.timeline} />
       </Card>
+
+      <RecordInterestModal
+        payment={recording}
+        customerName={transaction.customerName}
+        account={transaction.investment?.payoutAccount}
+        onClose={() => setRecording(null)}
+      />
     </div>
   )
 }

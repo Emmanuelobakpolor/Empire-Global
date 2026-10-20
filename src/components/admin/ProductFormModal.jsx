@@ -21,7 +21,23 @@ const EMPTY_FORM = {
   requirements: '',
   itemCategories: [],
   interestRate: '',
+  interestRates: { upfront: '', monthly: '', maturity: '', partial: '' },
   status: 'active',
+}
+
+// Yearly interest rates by product type; a blank one uses the default shown
+const PARTIAL_RATE_FIELD = { key: 'partial', label: 'After Partial Withdrawal (% a year)', hint: 'On the capital left, when withdrawn from before maturity. Default 12%.' }
+const RATE_FIELDS = {
+  investment: [
+    { key: 'upfront', label: 'Upfront Rate (%)', hint: 'Paid at the start. Default 30%.' },
+    { key: 'monthly', label: 'Monthly Rate (% a year)', hint: 'Paid in 12 monthly parts. Default 36% (3% a month).' },
+    { key: 'maturity', label: 'At Maturity Rate (%)', hint: 'Paid at the end of the year. Default 42%.' },
+    PARTIAL_RATE_FIELD,
+  ],
+  savings: [
+    { key: 'maturity', label: 'Interest Rate (% a year)', hint: 'Pro-rata over the plan, paid at maturity. Default 15%.' },
+    PARTIAL_RATE_FIELD,
+  ],
 }
 
 const STATUS_OPTIONS = [
@@ -68,6 +84,12 @@ export default function ProductFormModal({ open, onClose, onSave, initialData })
               requirements: toLines(initialData.requirements),
               itemCategories: initialData.itemCategories || [],
               interestRate: initialData.interestRate ?? '',
+              interestRates: {
+                upfront: initialData.interestRates?.upfront ?? '',
+                monthly: initialData.interestRates?.monthly ?? '',
+                maturity: initialData.interestRates?.maturity ?? '',
+                partial: initialData.interestRates?.partial ?? '',
+              },
             }
           : EMPTY_FORM
       )
@@ -78,6 +100,9 @@ export default function ProductFormModal({ open, onClose, onSave, initialData })
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
   const isHirePurchase = form.type === 'hire-purchase'
   const isFacility = isHirePurchase || form.type === 'loan'
+  const isInvestment = form.type === 'investment'
+  const rateFields = RATE_FIELDS[form.type]
+  const updateRate = (key) => (e) => setForm((f) => ({ ...f, interestRates: { ...f.interestRates, [key]: e.target.value } }))
 
   const toggleItemCategory = (value) =>
     setForm((f) => ({
@@ -112,8 +137,8 @@ export default function ProductFormModal({ open, onClose, onSave, initialData })
       minAmount: Number(form.minAmount),
       maxAmount: Number(form.maxAmount),
       expectedReturn: form.expectedReturn.trim() || null,
-      // Blank means open-ended: the plan has no expiry date
-      termOptions: form.termOptions.trim()
+      // Blank means open-ended: the plan has no expiry date. Investments are always 12 months.
+      termOptions: isInvestment ? [12] : form.termOptions.trim()
         ? [...new Set(form.termOptions.split(',').map((m) => Number(m.trim())).filter((m) => m > 0))].sort((a, b) => a - b)
         : null,
       benefits: benefits.length ? benefits : ['Transparent tracking'],
@@ -122,6 +147,12 @@ export default function ProductFormModal({ open, onClose, onSave, initialData })
       itemCategories: isHirePurchase ? form.itemCategories : [],
       // Blank: a Super Admin sets the rate when approving each application
       interestRate: isFacility && form.interestRate !== '' ? Number(form.interestRate) : null,
+      // Investments and savings: a blank rate uses the default
+      ...(rateFields && {
+        interestRates: Object.fromEntries(
+          rateFields.filter((f) => form.interestRates[f.key] !== '').map((f) => [f.key, Number(form.interestRates[f.key])])
+        ),
+      }),
     })
     setSaving(false)
     // The server checks limits and lists too; show anything it rejects on the form
@@ -147,32 +178,54 @@ export default function ProductFormModal({ open, onClose, onSave, initialData })
         <Select label="Product Type" value={form.type} onChange={update('type')} options={productTypes} />
         <Input label="Category" placeholder="e.g. Periodic Investment" value={form.category} onChange={update('category')} hint="Shown above the product name." />
         <Select label="Status" value={form.status} onChange={update('status')} options={STATUS_OPTIONS} />
-        <Input label="Expected Return" placeholder="e.g. 18% interest (leave blank if none)" value={form.expectedReturn} onChange={update('expectedReturn')} />
+        <Input label="Expected Return" placeholder="e.g. 30% upfront (leave blank if none)" value={form.expectedReturn} onChange={update('expectedReturn')} />
         <TextArea label="Description" value={form.description} onChange={update('description')} error={errors.description} />
         <Input label="Minimum Amount (₦)" type="number" value={form.minAmount} onChange={update('minAmount')} error={errors.minAmount} />
         <Input label="Maximum Amount (₦)" type="number" value={form.maxAmount} onChange={update('maxAmount')} error={errors.maxAmount} />
         <Input label="Duration (shown to customers)" placeholder="e.g. Minimum 6 months" value={form.duration} onChange={update('duration')} />
-        <Input
-          label="Plan Lengths (months)"
-          placeholder="e.g. 6, 9, 12"
-          value={form.termOptions}
-          onChange={update('termOptions')}
-          error={errors.termOptions}
-          hint="Used to calculate each plan's end date. Leave blank for no expiry."
-        />
+        {isInvestment ? (
+          <Input label="Plan Length (months)" value="12" disabled hint="Every investment is a 12-month contract." />
+        ) : (
+          <Input
+            label="Plan Lengths (months)"
+            placeholder="e.g. 6, 9, 12"
+            value={form.termOptions}
+            onChange={update('termOptions')}
+            error={errors.termOptions}
+            hint="Used to calculate each plan's end date. Leave blank for no expiry."
+          />
+        )}
         <Input label="Payment Frequency" placeholder="e.g. Daily or Weekly" value={form.frequency} onChange={update('frequency')} error={errors.frequency} hint="Separate options with commas or “or”." />
 
         {isFacility && (
           <Input
-            label="Interest Rate (% per month, flat)"
+            label="Interest Rate (% of the amount, flat)"
             type="number"
             min="0"
             step="0.01"
             value={form.interestRate}
             onChange={update('interestRate')}
             error={errors.interestRate}
-            hint="Leave blank to set it on each application when approving (e.g. when the item decides the rate)."
+            hint="Charged once on the amount, whatever the term. Leave blank for the default of 13%. A Super Admin can still change it on each application."
           />
+        )}
+        {rateFields && (
+          <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {rateFields.map((f) => (
+              <Input
+                key={f.key}
+                label={f.label}
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={form.interestRates[f.key]}
+                onChange={updateRate(f.key)}
+                hint={f.hint}
+              />
+            ))}
+            {errors.interestRates && <p className="sm:col-span-2 text-xs text-red-500">{errors.interestRates}</p>}
+          </div>
         )}
         {isHirePurchase && (
           <div className="sm:col-span-2">

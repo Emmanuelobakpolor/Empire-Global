@@ -146,7 +146,7 @@ export default function FacilityPanel({ transaction }) {
           <Stat label={isLoan ? 'Loan Amount' : 'Item Value'} value={formatCurrency(transaction.amount)} />
           <Stat label="Duration" value={formatTerm(transaction.termMonths)} />
           <Stat label="Repayment" value={frequencyLabel(facility.repaymentFrequency)} />
-          <Stat label="Interest" value={facility.interestRate != null ? `${facility.interestRate}% / month` : 'Set on approval'} />
+          <Stat label="Interest" value={facility.interestRate != null ? `${facility.interestRate}% flat` : 'Set on approval'} />
           <Stat label="Total to Repay" value={facility.totalRepayable != null ? formatCurrency(facility.totalRepayable) : '—'} />
           {status === 'active' || status === 'completed' ? (
             <Stat

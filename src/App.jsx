@@ -44,6 +44,7 @@ import AdminLogin from './pages/admin/AdminLogin'
 import AdminSetPassword from './pages/admin/AdminSetPassword'
 import AdminNotifications from './pages/admin/AdminNotifications'
 import AdminWithdrawals from './pages/admin/AdminWithdrawals'
+import AdminInterestPayouts from './pages/admin/AdminInterestPayouts'
 import AdminWithdrawalDetails from './pages/admin/AdminWithdrawalDetails'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import Customers from './pages/admin/Customers'
@@ -140,6 +141,7 @@ export default function App() {
                   <Route path="notifications" element={<AdminNotifications />} />
                   <Route path="withdrawals" element={<AdminWithdrawals />} />
                   <Route path="withdrawals/:reference" element={<AdminWithdrawalDetails />} />
+                  <Route path="interest-payouts" element={<AdminInterestPayouts />} />
                 </Route>
 
                 <Route path="*" element={<NotFound />} />

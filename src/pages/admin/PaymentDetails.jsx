@@ -16,6 +16,8 @@ import ReceiptPreview from '../../components/ReceiptPreview'
 import { AgentCell } from '../../components/admin/AgentFilter'
 import ApplicationDetails from '../../components/admin/ApplicationDetails'
 import PlanPeriodCard from '../../components/PlanPeriod'
+import InvestmentPanel from '../../components/customer/InvestmentPanel'
+import { interestEstimate, interestOptionLabel } from '../../utils/investment'
 import { useDataStore } from '../../context/DataStoreContext'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useToast } from '../../context/ToastContext'
@@ -34,7 +36,7 @@ const TRAIL_STYLE = {
 export default function PaymentDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { transactions, transactionsLoaded, customers, recordSlipView, recommendPayment, approvePayment, rejectPayment } = useDataStore()
+  const { transactions, transactionsLoaded, customers, products, recordSlipView, recommendPayment, approvePayment, rejectPayment } = useDataStore()
   const { admin, isSuperAdmin } = useAdminAuth()
   const { showToast } = useToast()
   const transaction = transactions.find((t) => t.id === id)
@@ -45,6 +47,8 @@ export default function PaymentDetails() {
   const [rejectOpen, setRejectOpen] = useState(false)
   const [approveOpen, setApproveOpen] = useState(false)
   const [reason, setReason] = useState('')
+  // Investments: the yearly interest rate, fixed on approval
+  const [rate, setRate] = useState('')
   const [processing, setProcessing] = useState(false)
 
   // Every admin who opens a slip is recorded in its review trail
@@ -65,6 +69,14 @@ export default function PaymentDetails() {
   const recommendation = latestRecommendation(transaction)
   const trail = transaction.slipTrail || []
   const isResolved = transaction.status === 'approved' || transaction.status === 'rejected'
+  const investment = transaction.investment
+  const productRate = products.find((p) => p.id === transaction.productId)?.interestRates?.[investment?.option]
+  const ratePreview = investment && rate !== '' ? interestEstimate(transaction.amount, Number(rate), investment.option, transaction.termMonths) : null
+
+  const openApprove = () => {
+    setRate(productRate != null ? String(productRate) : '')
+    setApproveOpen(true)
+  }
 
   // Runs a review action on the server; the dialog stays open if it fails
   const run = async (action, onSuccess) => {
@@ -87,11 +99,16 @@ export default function PaymentDetails() {
       setNote('')
     })
 
-  const handleApprove = () =>
-    run(() => approvePayment(transaction.id), () => {
+  const handleApprove = () => {
+    if (investment && (rate === '' || Number(rate) < 0)) {
+      showToast('Enter the interest rate for this investment.', 'error')
+      return
+    }
+    return run(() => approvePayment(transaction.id, '', investment ? rate : undefined), () => {
       setApproveOpen(false)
-      showToast('Payment approved. The customer has been credited.', 'success')
+      showToast(investment ? 'Payment approved. The investment has started and its interest is scheduled.' : 'Payment approved. The customer has been credited.', 'success')
     })
+  }
 
   const handleReject = () =>
     run(() => rejectPayment(transaction.id, reason), () => {
@@ -152,6 +169,8 @@ export default function PaymentDetails() {
 
       <PlanPeriodCard transaction={transaction} />
 
+      {investment && <InvestmentPanel transaction={transaction} />}
+
       <ApplicationDetails transaction={transaction} />
 
       {/* ---- Review stage + actions ---- */}
@@ -184,7 +203,7 @@ export default function PaymentDetails() {
               <Button variant="danger" icon={XCircle} fullWidth onClick={() => setRejectOpen(true)} disabled={processing}>
                 Reject
               </Button>
-              <Button variant="accent" icon={CheckCircle2} fullWidth onClick={() => setApproveOpen(true)} disabled={processing}>
+              <Button variant="accent" icon={CheckCircle2} fullWidth onClick={openApprove} disabled={processing}>
                 Give Final Approval
               </Button>
             </div>
@@ -261,8 +280,41 @@ export default function PaymentDetails() {
         />
       </Modal>
 
+      <Modal
+        open={approveOpen && !!investment}
+        onClose={() => setApproveOpen(false)}
+        title="Give final approval?"
+        subtitle={`${transaction.customerName} will be credited ${formatCurrency(transaction.amount)} for ${transaction.productName}. The plan starts today and its interest is scheduled. This is the final decision.`}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setApproveOpen(false)}>Cancel</Button>
+            <Button variant="accent" loading={processing} onClick={handleApprove}>Approve</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <Input
+            label="Interest Rate (% a year)"
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            value={rate}
+            onChange={(e) => setRate(e.target.value)}
+            hint={`Interest paid ${interestOptionLabel(investment?.option).toLowerCase()}${productRate != null ? `; the product's rate for that is ${productRate}% a year` : ''}.`}
+            required
+          />
+          {ratePreview && (
+            <p className="rounded-xl bg-emerald-50/60 border border-emerald-100 px-4 py-3 text-sm text-navy-700">
+              <strong>{formatCurrency(ratePreview.total)}</strong> interest
+              {ratePreview.count > 1 ? `, paid as ${ratePreview.count} monthly payments of ${formatCurrency(ratePreview.each)}` : investment.option === 'upfront' ? ', due today' : `, due in ${transaction.termMonths} month${transaction.termMonths === 1 ? '' : 's'} with the capital`}.
+            </p>
+          )}
+        </div>
+      </Modal>
+
       <ConfirmDialog
-        open={approveOpen}
+        open={approveOpen && !investment}
         onClose={() => setApproveOpen(false)}
         onConfirm={handleApprove}
         loading={processing}

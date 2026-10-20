@@ -22,7 +22,7 @@ import { formatCurrency } from '../../utils/formatCurrency'
 import { formatDate } from '../../utils/formatDate'
 import { formatTerm } from '../../utils/planPeriod'
 import { TRAIL_LABELS, latestRecommendation } from '../../utils/slipReview'
-import { REPAYMENT_STATE, estimateRepayment, facilityStatus, frequencyLabel } from '../../utils/facility'
+import { REPAYMENT_STATE, estimateRepayment, facilityStatus, frequencyLabel, repayableTotal } from '../../utils/facility'
 
 const TRAIL_ICONS = {
   viewed: { icon: Eye, tone: 'bg-navy-50 text-navy-500' },
@@ -155,12 +155,12 @@ function RepaymentRow({ repayment, isSuperAdmin, onAction }) {
 export default function AdminFacilityDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { transactions, transactionsLoaded, products, recommendPayment, approvePayment, rejectPayment, disburseFacility, repaymentAction } = useDataStore()
+  const { transactions, transactionsLoaded, products, recommendPayment, approvePayment, rejectPayment, disburseFacility, changeInterestRate, repaymentAction } = useDataStore()
   const { isSuperAdmin } = useAdminAuth()
   const { showToast } = useToast()
   const transaction = transactions.find((t) => t.id === id)
 
-  // { kind: 'application' | 'repayment', action: 'recommend' | 'approve' | 'reject', decision?, repayment? }
+  // { kind: 'application' | 'repayment' | 'rate', action: 'recommend' | 'approve' | 'reject' | 'change', decision?, repayment? }
   const [dialog, setDialog] = useState(null)
   const [note, setNote] = useState('')
   const [rate, setRate] = useState('')
@@ -176,13 +176,22 @@ export default function AdminFacilityDetails() {
   const facility = transaction.facility
   const isLoan = transaction.productType === 'loan'
   const status = facilityStatus(transaction)
-  const productRate = products.find((p) => p.id === transaction.productId)?.interestRate
+  const product = products.find((p) => p.id === transaction.productId)
+  const productRate = product?.effectiveInterestRate ?? product?.interestRate
   const rateValue = rate === '' ? productRate : Number(rate)
   const preview = estimateRepayment(transaction.amount, rateValue, transaction.termMonths, facility.repaymentFrequency)
+  // The rate can be changed from approval until the last instalment is confirmed
+  const canChangeRate = isSuperAdmin && (facility.status === 'awaiting_disbursement' || facility.status === 'active')
+  const unpaidCount = facility.repayments.filter((r) => r.state !== 'paid').length
+  const repricePreview = dialog?.kind === 'rate' && rate !== '' && facility.status === 'active' && unpaidCount > 0
+    ? { total: repayableTotal(transaction.amount, Number(rate)), count: unpaidCount }
+    : null
+  const asksRate = dialog?.kind === 'rate' || (dialog?.kind === 'application' && dialog.action === 'approve')
 
   const openDialog = (next) => {
     setNote('')
-    setRate(next.kind === 'application' && next.action === 'approve' && productRate != null ? String(productRate) : '')
+    if (next.kind === 'rate') setRate(String(facility.interestRate))
+    else setRate(next.kind === 'application' && next.action === 'approve' && productRate != null ? String(productRate) : '')
     setDialog(next)
   }
 
@@ -201,10 +210,11 @@ export default function AdminFacilityDetails() {
 
   const submitDialog = () => {
     const { kind, action, decision, repayment } = dialog
-    if (action === 'approve' && kind === 'application' && (rate === '' || Number(rate) < 0)) {
-      showToast('Enter the monthly interest rate for this application.', 'error')
+    if (asksRate && (rate === '' || Number(rate) < 0)) {
+      showToast('Enter the interest rate for this application.', 'error')
       return
     }
+    if (kind === 'rate') return run(() => changeInterestRate(transaction.id, rate, note.trim()), 'Interest rate updated. The customer has been notified.')
     if (kind === 'application') {
       if (action === 'recommend') return run(() => recommendPayment(transaction.id, decision, note.trim()), 'Recommendation sent to a Super Admin.')
       if (action === 'approve') return run(() => approvePayment(transaction.id, note.trim(), rate), 'Application approved. The customer has been notified.')
@@ -215,6 +225,7 @@ export default function AdminFacilityDetails() {
   }
 
   const dialogTitle = !dialog ? '' : {
+    change: 'Change Interest Rate',
     recommend: dialog.decision === 'approve' ? 'Recommend Approval' : 'Recommend Rejection',
     approve: dialog.kind === 'application' ? 'Approve Application' : 'Confirm Repayment',
     reject: dialog.kind === 'application' ? 'Reject Application' : 'Reject Receipt',
@@ -241,7 +252,14 @@ export default function AdminFacilityDetails() {
           <Stat icon={Hash} label={isLoan ? 'Loan Amount' : 'Item Value'}>{formatCurrency(transaction.amount)}</Stat>
           <Stat icon={Calendar} label="Applied">{formatDate(transaction.date)}</Stat>
           <Stat icon={Repeat} label="Repayment">{frequencyLabel(facility.repaymentFrequency)} · {formatTerm(transaction.termMonths)}</Stat>
-          <Stat label="Interest">{facility.interestRate != null ? `${facility.interestRate}% a month` : productRate != null ? `Product rate ${productRate}%` : 'Not set'}</Stat>
+          <Stat label="Interest">
+            {facility.interestRate != null ? `${facility.interestRate}% flat` : productRate != null ? `Product rate ${productRate}%` : 'Not set'}
+            {canChangeRate && (
+              <button type="button" onClick={() => openDialog({ kind: 'rate', action: 'change' })} className="ml-2 text-xs font-semibold text-emerald-600 hover:text-emerald-700">
+                Change
+              </button>
+            )}
+          </Stat>
           <Stat label="Total to Repay">{facility.totalRepayable != null ? formatCurrency(facility.totalRepayable) : '—'}</Stat>
           <Stat label="Confirmed Paid">{formatCurrency(facility.amountPaid)}</Stat>
           <Stat label="Outstanding">{facility.outstanding != null ? formatCurrency(facility.outstanding) : '—'}</Stat>
@@ -258,7 +276,7 @@ export default function AdminFacilityDetails() {
           <p className="text-sm text-navy-500 mb-4 flex items-start gap-2">
             {isSuperAdmin ? <ShieldCheck size={16} className="text-emerald-500 mt-0.5 shrink-0" /> : <Clock size={16} className="text-amber-500 mt-0.5 shrink-0" />}
             {isSuperAdmin
-              ? 'Check the documents, guarantor and bank account below. Approving fixes the interest rate and the total the customer repays.'
+              ? 'Check the documents, guarantor and bank account below. Approving sets the interest rate and the total the customer repays.'
               : 'Check the documents, guarantor and bank account below, then recommend. A Super Admin gives the final decision.'}
           </p>
           <ReviewButtons
@@ -354,7 +372,10 @@ export default function AdminFacilityDetails() {
           dialog?.action === 'recommend' ? 'Your recommendation is sent to a Super Admin for the final decision.'
             : dialog?.action === 'reject' ? 'The customer will see this reason.'
             : dialog?.kind === 'repayment' ? `Confirms ${formatCurrency(dialog.repayment.amount)} for instalment ${dialog.repayment.number}. This is final.`
-            : 'This is the final decision. The rate can’t be changed afterwards.'
+            : dialog?.kind === 'rate' ? (facility.status === 'active'
+              ? 'Confirmed repayments stay as they are; the rest of the new total is spread evenly over the unpaid instalments. The customer is notified.'
+              : 'Changes the total the customer repays. The customer is notified.')
+            : 'This is the final decision. You can still change the rate later, until it’s fully repaid.'
         }
         footer={
           <>
@@ -370,20 +391,28 @@ export default function AdminFacilityDetails() {
         }
       >
         <div className="flex flex-col gap-4">
-          {dialog?.kind === 'application' && dialog.action === 'approve' && (
+          {asksRate && (
             <>
               <Input
-                label="Interest Rate (% per month, flat)"
+                label="Interest Rate (% of the amount, flat)"
                 type="number"
                 min="0"
                 max="100"
                 step="0.01"
                 value={rate}
                 onChange={(e) => setRate(e.target.value)}
-                hint={productRate != null ? `The product’s rate is ${productRate}%.` : 'This product has no set rate; it depends on the item or applicant.'}
+                hint={dialog.kind === 'rate'
+                  ? `Currently ${facility.interestRate}%. Charged once on ${formatCurrency(transaction.amount)}, whatever the term.`
+                  : productRate != null ? `The product’s rate is ${productRate}%. Charged once, whatever the term.` : undefined}
                 required
               />
-              {preview && rate !== '' && (
+              {repricePreview ? (
+                <p className="rounded-xl bg-emerald-50/60 border border-emerald-100 px-4 py-3 text-sm text-navy-700">
+                  New total <strong>{formatCurrency(repricePreview.total)}</strong>. After the {formatCurrency(facility.amountPaid)} already repaid,{' '}
+                  {repricePreview.count} instalment{repricePreview.count === 1 ? '' : 's'} of about{' '}
+                  <strong>{formatCurrency(Math.max(0, repricePreview.total - facility.amountPaid) / repricePreview.count)}</strong> remain.
+                </p>
+              ) : preview && rate !== '' && (
                 <p className="rounded-xl bg-emerald-50/60 border border-emerald-100 px-4 py-3 text-sm text-navy-700">
                   Customer repays <strong>{formatCurrency(preview.total)}</strong>: {preview.count} {frequencyLabel(facility.repaymentFrequency).toLowerCase()} instalment{preview.count === 1 ? '' : 's'} of about{' '}
                   <strong>{formatCurrency(preview.each)}</strong>.

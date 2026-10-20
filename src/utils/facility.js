@@ -56,10 +56,12 @@ export function instalmentCount(termMonths, frequency, start = new Date().toISOS
   return Math.max(1, Math.ceil(days / (frequency === 'daily' ? 1 : 7)))
 }
 
-// Flat interest: a percent of the amount for each month of the term
+export const repayableTotal = (amount, rate) => Math.round(amount * (1 + rate / 100) * 100) / 100
+
+// Flat interest: a percent of the amount, charged once whatever the term
 export function estimateRepayment(amount, rate, termMonths, frequency) {
   if (rate === null || rate === undefined || !amount || !frequency) return null
-  const total = Math.round(amount * (1 + (rate / 100) * (termMonths || 1)) * 100) / 100
+  const total = repayableTotal(amount, rate)
   const count = instalmentCount(termMonths, frequency)
   return { total, count, each: Math.round((total / count) * 100) / 100 }
 }

@@ -219,6 +219,7 @@ export default function Withdrawals() {
                 <p className="text-xs text-navy-500 mt-1">
                   From {w.productName} · to {w.bankName} {w.accountNumber}
                   {w.penalty > 0 && ` · ${formatCurrency(w.penalty)} penalty`}
+                  {w.interestDeducted > 0 && ` · ${formatCurrency(w.interestDeducted)} interest forfeited`}
                 </p>
                 <p className="text-xs text-navy-400 mt-0.5 font-mono">{w.reference} · requested {formatDate(w.createdAt)}</p>
                 {w.status === 'approved' && <p className="text-xs text-blue-600 mt-1">Payout from {formatDate(w.earliestPayoutDate)}</p>}
@@ -265,8 +266,9 @@ function QuotePanel({ quote, quoting, notes }) {
   return (
     <div className={`rounded-xl border border-navy-100 divide-y divide-navy-50 transition-opacity ${quoting ? 'opacity-60' : ''}`}>
       {[
-        { label: quote.kind === 'full' ? 'Withdrawing (whole plan)' : 'Withdrawing', value: formatCurrency(quote.payoutAmount + quote.penalty) },
+        { label: quote.kind === 'full' ? 'Withdrawing (whole plan)' : 'Withdrawing', value: formatCurrency(quote.payoutAmount + quote.penalty + (quote.interestDeducted || 0)) },
         ...(quote.penalty > 0 ? [{ label: `Early termination penalty (${quote.penaltyPercent}%)`, value: `− ${formatCurrency(quote.penalty)}`, tone: 'text-red-500' }] : []),
+        ...(quote.interestDeducted > 0 ? [{ label: 'Interest already paid, no longer earned', value: `− ${formatCurrency(quote.interestDeducted)}`, tone: 'text-red-500' }] : []),
         { label: 'You receive', value: formatCurrency(quote.payoutAmount), bold: true },
         { label: 'Earliest payout', value: formatDate(quote.earliestPayoutDate) },
       ].map((row) => (

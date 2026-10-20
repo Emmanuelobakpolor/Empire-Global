@@ -228,7 +228,7 @@ const FAQS = [
   },
   {
     question: 'How is my repayment schedule calculated?',
-    answer: 'The item you request determines the interest rate used to calculate your repayments.',
+    answer: 'Interest is a flat percentage of the amount you borrow or the item’s value, charged once whatever the term (13% unless a different rate is agreed for your application). The total is split evenly across your instalments.',
   },
 ]
 

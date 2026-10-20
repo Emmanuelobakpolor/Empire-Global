@@ -115,6 +115,7 @@ export default function AdminWithdrawalDetails() {
           {[
             { label: 'Withdrawing', value: formatCurrency(wd.amount) },
             { label: 'Penalty', value: wd.penalty ? formatCurrency(wd.penalty) : '—' },
+            ...(wd.interestDeducted ? [{ label: 'Interest forfeited', value: formatCurrency(wd.interestDeducted) }] : []),
             { label: 'To pay out', value: formatCurrency(wd.payoutAmount), strong: true },
             { label: 'Pay from', value: formatDate(wd.earliestPayoutDate) },
           ].map((s) => (

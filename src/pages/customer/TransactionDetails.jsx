@@ -10,6 +10,7 @@ import TransactionTimeline from '../../components/customer/TransactionTimeline'
 import PlanPeriodCard from '../../components/PlanPeriod'
 import PaymentAccountCard from '../../components/customer/PaymentAccountCard'
 import FacilityPanel from '../../components/customer/FacilityPanel'
+import InvestmentPanel from '../../components/customer/InvestmentPanel'
 import { facilityStatus, frequencyLabel } from '../../utils/facility'
 import { useDataStore } from '../../context/DataStoreContext'
 import { formatCurrency } from '../../utils/formatCurrency'
@@ -107,6 +108,8 @@ export default function TransactionDetails() {
       )}
 
       {!facility && <PlanPeriodCard transaction={transaction} />}
+
+      {transaction.investment && <InvestmentPanel transaction={transaction} />}
 
       {transaction.receipt && (
         <Card className="mb-6">

@@ -15,6 +15,7 @@ import {
   fromApiPerson, toApiPerson,
 } from '../../components/customer/ApplicationForms'
 import { bankAccountErrors, estimateRepayment, frequencyLabel } from '../../utils/facility'
+import { INTEREST_OPTIONS, interestEstimate, interestOptionLabel, rateLabel } from '../../utils/investment'
 import { useDataStore } from '../../context/DataStoreContext'
 import GeneratingTransaction, { GENERATING_MS } from '../../components/customer/GeneratingTransaction'
 import { useAuth } from '../../context/AuthContext'
@@ -28,6 +29,7 @@ const STEP_LABELS = {
   product: 'Product',
   amount: 'Amount',
   plan: 'Plan',
+  interest: 'Interest',
   item: 'Item',
   documents: 'Documents',
   guarantor: 'Guarantor',
@@ -35,6 +37,41 @@ const STEP_LABELS = {
   nextOfKin: 'Next of Kin',
   review: 'Review',
   done: 'Generated',
+}
+
+// The three ways an investment's interest can be paid, with what each earns on this amount
+function InterestOptionPicker({ amount, rates, value, onChange }) {
+  return (
+    <div className="flex flex-col gap-3">
+      {Object.entries(INTEREST_OPTIONS).map(([option, info]) => {
+        const rate = rates?.[option]
+        const estimate = interestEstimate(amount, rate, option)
+        const selected = value === option
+        return (
+          <button
+            key={option}
+            type="button"
+            onClick={() => onChange(option)}
+            className={`text-left rounded-xl border-2 p-4 transition-colors ${selected ? 'border-emerald-500 bg-emerald-50/50' : 'border-navy-100 hover:border-navy-200'}`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-navy-900">{info.label} · {rateLabel(option, rate)}</p>
+                <p className="text-xs text-navy-500 mt-0.5">{info.when}.</p>
+              </div>
+              {selected && <Check size={18} className="text-emerald-500 shrink-0" />}
+            </div>
+            {estimate && (
+              <p className="text-sm text-navy-700 mt-2">
+                <strong className="text-navy-900">{formatCurrency(estimate.total)}</strong> interest
+                {estimate.count > 1 && <> · {formatCurrency(estimate.each)} a month</>}
+              </p>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 // What the customer can expect to repay, when the product has a set rate
@@ -81,7 +118,9 @@ export default function CreateTransaction() {
   const [item, setItem] = useState({ category: '', description: '' })
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [repaymentFrequency, setRepaymentFrequency] = useState('')
-  // The customer's own account, where a loan is paid out to
+  // Investments: how interest is paid (upfront, monthly or at maturity)
+  const [interestOption, setInterestOption] = useState('')
+  // The customer's own account, where a loan is paid out to or investment interest is sent
   const [bankAccount, setBankAccount] = useState({ ...EMPTY_BANK_ACCOUNT, accountName: user?.fullName || '' })
   // Savings / investment next of kin, pre-filled from the customer's profile
   const savedNextOfKin = customers.find((c) => c.id === user?.id)?.nextOfKin || user?.nextOfKin
@@ -93,23 +132,31 @@ export default function CreateTransaction() {
   const needsApplication = NEEDS_APPLICATION.includes(product?.type)
   const needsNextOfKin = NEEDS_NEXT_OF_KIN.includes(product?.type)
   const isHirePurchase = product?.type === 'hire-purchase'
+  const isInvestment = product?.type === 'investment'
   const hasClauses = product?.clauses?.length > 0
   const termOptions = product?.termOptions || []
   const repaymentOptions = product?.repaymentFrequencies || []
   // Products with one way to repay (e.g. a salary advance on payday) don't ask
   const chosenFrequency = repaymentOptions.length === 1 ? repaymentOptions[0] : repaymentFrequency
-  const estimate = needsApplication ? estimateRepayment(Number(amount), product?.interestRate, termOptions.length > 1 ? termMonths : termOptions[0], chosenFrequency) : null
+  const estimate = needsApplication ? estimateRepayment(Number(amount), product?.effectiveInterestRate ?? product?.interestRate, termOptions.length > 1 ? termMonths : termOptions[0], chosenFrequency) : null
   // Single-option products have a fixed term; null termOptions means open-ended
   const chosenTerm = termOptions.length > 1 ? termMonths : termOptions[0] ?? null
+  // Savings with a set length earn interest at maturity; open-ended ones don't
+  const savingsInterest = product?.type === 'savings' && !!chosenTerm
+  const earnsInterest = isInvestment || savingsInterest
+  const chosenOption = isInvestment ? interestOption : 'maturity'
+  const interest = earnsInterest ? interestEstimate(Number(amount), product?.interestRates?.[chosenOption], chosenOption, isInvestment ? 12 : chosenTerm) : null
   const today = new Date().toISOString().slice(0, 10)
   const period = product ? { start: today, end: chosenTerm ? addMonths(today, chosenTerm) : null } : null
 
   const steps = [
     'product',
     'amount',
-    'plan',
+    // An investment's plan is always 12 months; the customer chooses how interest is paid instead
+    isInvestment ? 'interest' : 'plan',
     ...(isHirePurchase ? ['item'] : []),
     ...(needsApplication ? ['documents', 'guarantor', 'account'] : []),
+    ...(earnsInterest ? ['account'] : []),
     ...(needsNextOfKin ? ['nextOfKin'] : []),
     'review',
     'done',
@@ -127,6 +174,7 @@ export default function CreateTransaction() {
     setItem({ category: '', description: '' })
     setTermMonths(null)
     setRepaymentFrequency('')
+    setInterestOption('')
   }, [productId])
 
   const canGoNext = () => {
@@ -135,6 +183,7 @@ export default function CreateTransaction() {
       const num = Number(amount)
       return num > 0 && (!product || (num >= product.minAmount && num <= product.maxAmount))
     }
+    if (current === 'interest') return !!interestOption
     if (current === 'plan') return (needsApplication ? !!chosenFrequency : !!planFrequency) && (termOptions.length <= 1 || !!termMonths)
     if (current === 'documents') return documentsComplete(documents, product)
     if (current === 'review' && hasClauses) return acceptedTerms
@@ -160,6 +209,10 @@ export default function CreateTransaction() {
       ...(needsApplication && {
         application: { guarantor: toApiPerson(guarantorDetails), ...(isHirePurchase && { item }) },
         repaymentFrequency: chosenFrequency,
+        disbursementAccount: { ...bankAccount, bankName: bankAccount.bankName.trim(), accountName: bankAccount.accountName.trim() },
+      }),
+      ...(earnsInterest && {
+        ...(isInvestment && { interestOption }),
         disbursementAccount: { ...bankAccount, bankName: bankAccount.bankName.trim(), accountName: bankAccount.accountName.trim() },
       }),
       ...(needsNextOfKin && { nextOfKin: apiNextOfKin }),
@@ -313,7 +366,32 @@ export default function CreateTransaction() {
                   <strong className="text-navy-900">{formatDate(period.end)}</strong>.
                 </p>
               )}
+              {savingsInterest && interest && (
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 text-sm text-navy-700">
+                  <p>
+                    Earns <strong className="text-navy-900">{product.interestRates.maturity}% a year</strong>:{' '}
+                    <strong className="text-navy-900">{formatCurrency(interest.total)}</strong> interest, paid to you at maturity.
+                  </p>
+                  <p className="text-xs text-navy-400 mt-1">
+                    A partial withdrawal before maturity lowers this to {product.interestRates.partial}% a year on what’s left. Your plan starts when your payment is confirmed.
+                  </p>
+                </div>
+              )}
             </div>
+          </div>
+        )}
+
+        {current === 'interest' && product && (
+          <div>
+            <h3 className="text-base font-bold text-navy-900 mb-1">How Would You Like Your Interest?</h3>
+            <p className="text-sm text-navy-400 mb-5">
+              Your investment runs for 12 months from when your payment is confirmed. Choose when your interest is paid to you.
+            </p>
+            <InterestOptionPicker amount={Number(amount)} rates={product.interestRates} value={interestOption} onChange={setInterestOption} />
+            <p className="text-xs text-navy-400 mt-4">
+              Partial withdrawals open after 8 months and lower the rate to {product.interestRates?.partial}% a year on what’s left.
+              Ending the investment before 12 months forfeits its interest. Either way, interest already paid to you above what you then earn is deducted from the withdrawal.
+            </p>
           </div>
         )}
 
@@ -356,9 +434,11 @@ export default function CreateTransaction() {
               <Landmark size={18} className="text-emerald-500" /> Your Bank Account
             </h3>
             <p className="text-sm text-navy-400 mb-5">
-              {isHirePurchase
-                ? 'Your own account, kept on your application for refunds and to match your repayments.'
-                : 'Where we’ll pay your loan once it’s approved. It must be in your name.'}
+              {earnsInterest
+                ? 'Where we’ll send your interest. It must be in your name.'
+                : isHirePurchase
+                  ? 'Your own account, kept on your application for refunds and to match your repayments.'
+                  : 'Where we’ll pay your loan once it’s approved. It must be in your name.'}
             </p>
             <BankAccountForm value={bankAccount} onChange={setBankAccount} errors={errors} />
           </div>
@@ -400,20 +480,30 @@ export default function CreateTransaction() {
                 { label: isHirePurchase ? 'Item Value' : 'Loan Amount', value: formatCurrency(Number(amount)) },
                 { label: 'Repayment', value: frequencyLabel(chosenFrequency) },
                 { label: 'Duration', value: formatTerm(chosenTerm) },
-                { label: 'Interest', value: product.interestRate != null ? `${product.interestRate}% a month (flat)` : 'Set on approval' },
+                { label: 'Interest', value: (product.effectiveInterestRate ?? product.interestRate) != null ? `${product.effectiveInterestRate ?? product.interestRate}% of the amount (flat)` : 'Set on approval' },
                 ...(estimate ? [{ label: 'Estimated Total to Repay', value: formatCurrency(estimate.total) }] : []),
                 { label: 'Customer', value: user?.fullName },
               ] : [
                 { label: 'Product', value: product.name },
                 { label: 'Type', value: productTypes.find((t) => t.value === product.type)?.label },
                 { label: 'Amount', value: formatCurrency(Number(amount)) },
-                { label: 'Payment Frequency', value: planFrequency },
+                ...(isInvestment ? [] : [{ label: 'Payment Frequency', value: planFrequency }]),
+                ...(earnsInterest ? [
+                  { label: 'Interest', value: `${interestOptionLabel(chosenOption)} · ${rateLabel(chosenOption, product.interestRates?.[chosenOption])}` },
+                  ...(interest ? [{ label: 'Total Interest', value: formatCurrency(interest.total) }] : []),
+                ] : []),
                 { label: 'Duration', value: formatTerm(chosenTerm) },
                 { label: 'Start Date', value: formatDate(period.start) },
                 { label: 'End Date', value: period.end ? formatDate(period.end) : 'No expiry' },
                 { label: 'Customer', value: user?.fullName },
               ]}
             />
+            {earnsInterest && (
+              <>
+                <p className="text-xs font-bold uppercase tracking-wider text-navy-400 mt-6 mb-2">Interest Paid To</p>
+                <DetailList rows={bankAccountRows(bankAccount)} />
+              </>
+            )}
             {needsApplication && (
               <>
                 <p className="text-xs font-bold uppercase tracking-wider text-navy-400 mt-6 mb-2">Your Bank Account</p>
