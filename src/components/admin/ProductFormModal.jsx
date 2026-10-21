@@ -27,13 +27,12 @@ const EMPTY_FORM = {
 }
 
 // Yearly interest rates by product type; a blank one uses the default shown
-const PARTIAL_RATE_FIELD = { key: 'partial', label: 'After Partial Withdrawal (% a year)', hint: 'On the capital left, when withdrawn from before maturity. Default 12%.' }
+const PARTIAL_RATE_FIELD = { key: 'partial', label: 'After Partial Withdrawal (% a year)', hint: 'On the capital left, when partly withdrawn from month 8. Default 12%.' }
 const RATE_FIELDS = {
   investment: [
     { key: 'upfront', label: 'Upfront Rate (%)', hint: 'Paid at the start. Default 30%.' },
     { key: 'monthly', label: 'Monthly Rate (% a year)', hint: 'Paid in 12 monthly parts. Default 36% (3% a month).' },
     { key: 'maturity', label: 'At Maturity Rate (%)', hint: 'Paid at the end of the year. Default 42%.' },
-    PARTIAL_RATE_FIELD,
   ],
   savings: [
     { key: 'maturity', label: 'Interest Rate (% a year)', hint: 'Pro-rata over the plan, paid at maturity. Default 15%.' },

@@ -383,7 +383,7 @@ export default function CreateTransaction() {
                     <strong className="text-navy-900">{formatCurrency(interest.total)}</strong> interest, paid to you at maturity.
                   </p>
                   <p className="text-xs text-navy-400 mt-1">
-                    A partial withdrawal before maturity lowers this to {product.interestRates.partial}% a year on what’s left. Your plan starts when your payment is confirmed.
+                    Partial withdrawals open after the 8th month and lower this to {product.interestRates.partial}% a year on what’s left. Ending the plan early forfeits its interest. Your plan starts when your payment is confirmed.
                   </p>
                 </div>
               )}
@@ -399,8 +399,7 @@ export default function CreateTransaction() {
             </p>
             <InterestOptionPicker amount={Number(amount)} rates={product.interestRates} value={interestOption} onChange={setInterestOption} />
             <p className="text-xs text-navy-400 mt-4">
-              Partial withdrawals open after 8 months and lower the rate to {product.interestRates?.partial}% a year on what’s left.
-              Ending the investment before 12 months forfeits its interest. Either way, interest already paid to you above what you then earn is deducted from the withdrawal.
+              The investment can’t be partly withdrawn before it matures. Ending it before 12 months forfeits its interest: anything already paid to you is deducted from your capital.
             </p>
           </div>
         )}
