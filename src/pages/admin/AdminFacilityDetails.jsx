@@ -22,7 +22,7 @@ import { formatCurrency } from '../../utils/formatCurrency'
 import { formatDate } from '../../utils/formatDate'
 import { formatTerm } from '../../utils/planPeriod'
 import { TRAIL_LABELS, latestRecommendation } from '../../utils/slipReview'
-import { REPAYMENT_STATE, estimateRepayment, facilityStatus, frequencyLabel, repayableTotal } from '../../utils/facility'
+import { REPAYMENT_STATE, estimateFees, estimateRepayment, facilityStatus, frequencyLabel, repayableTotal } from '../../utils/facility'
 
 const TRAIL_ICONS = {
   viewed: { icon: Eye, tone: 'bg-navy-50 text-navy-500' },
@@ -164,6 +164,8 @@ export default function AdminFacilityDetails() {
   const [dialog, setDialog] = useState(null)
   const [note, setNote] = useState('')
   const [rate, setRate] = useState('')
+  // Fees set on approval: legal %, inspection ₦ (depends on location), application ₦
+  const [fees, setFees] = useState({ legalPercent: '', inspection: '', application: '' })
   const [disburseOpen, setDisburseOpen] = useState(false)
   const [reference, setReference] = useState('')
   const [busy, setBusy] = useState(false)
@@ -179,12 +181,14 @@ export default function AdminFacilityDetails() {
   const product = products.find((p) => p.id === transaction.productId)
   const productRate = product?.effectiveInterestRate ?? product?.interestRate
   const rateValue = rate === '' ? productRate : Number(rate)
-  const preview = estimateRepayment(transaction.amount, rateValue, transaction.termMonths, facility.repaymentFrequency)
+  const feePreview = estimateFees(transaction.amount, fees)
+  const preview = estimateRepayment(transaction.amount, rateValue, transaction.termMonths, facility.repaymentFrequency, feePreview, transaction.productType)
+  const hpFees = isLoan ? 0 : facility.fees?.total || 0
   // The rate can be changed from approval until the last instalment is confirmed
   const canChangeRate = isSuperAdmin && (facility.status === 'awaiting_disbursement' || facility.status === 'active')
   const unpaidCount = facility.repayments.filter((r) => r.state !== 'paid').length
   const repricePreview = dialog?.kind === 'rate' && rate !== '' && facility.status === 'active' && unpaidCount > 0
-    ? { total: repayableTotal(transaction.amount, Number(rate)), count: unpaidCount }
+    ? { total: repayableTotal(transaction.amount, Number(rate)) + hpFees, count: unpaidCount }
     : null
   const asksRate = dialog?.kind === 'rate' || (dialog?.kind === 'application' && dialog.action === 'approve')
 
@@ -192,6 +196,13 @@ export default function AdminFacilityDetails() {
     setNote('')
     if (next.kind === 'rate') setRate(String(facility.interestRate))
     else setRate(next.kind === 'application' && next.action === 'approve' && productRate != null ? String(productRate) : '')
+    if (next.kind === 'application' && next.action === 'approve') {
+      setFees({
+        legalPercent: String(product?.fees?.legalPercent ?? 1),
+        inspection: String(product?.fees?.inspection ?? 2000),
+        application: String(product?.fees?.application ?? 3000),
+      })
+    }
     setDialog(next)
   }
 
@@ -217,7 +228,15 @@ export default function AdminFacilityDetails() {
     if (kind === 'rate') return run(() => changeInterestRate(transaction.id, rate, note.trim()), 'Interest rate updated. The customer has been notified.')
     if (kind === 'application') {
       if (action === 'recommend') return run(() => recommendPayment(transaction.id, decision, note.trim()), 'Recommendation sent to a Super Admin.')
-      if (action === 'approve') return run(() => approvePayment(transaction.id, note.trim(), rate), 'Application approved. The customer has been notified.')
+      if (action === 'approve') {
+        if (Object.values(fees).some((v) => v === '' || Number(v) < 0)) {
+          showToast('Enter each fee (0 for none).', 'error')
+          return
+        }
+        return run(() => approvePayment(transaction.id, note.trim(), rate, {
+          legalFeePercent: fees.legalPercent, inspectionFee: fees.inspection, applicationFee: fees.application,
+        }), 'Application approved. The customer has been notified.')
+      }
       return run(() => rejectPayment(transaction.id, note.trim()), 'Application rejected. The customer has been notified.')
     }
     if (action === 'recommend') return run(() => repaymentAction(repayment.id, 'recommend', { decision, note: note.trim() }), 'Recommendation sent to a Super Admin.')
@@ -260,6 +279,8 @@ export default function AdminFacilityDetails() {
               </button>
             )}
           </Stat>
+          <Stat label="Fees">{facility.fees ? formatCurrency(facility.fees.total) : 'Set on approval'}</Stat>
+          {isLoan && facility.payoutAmount != null && <Stat label="Pay Out">{formatCurrency(facility.payoutAmount)}</Stat>}
           <Stat label="Total to Repay">{facility.totalRepayable != null ? formatCurrency(facility.totalRepayable) : '—'}</Stat>
           <Stat label="Confirmed Paid">{formatCurrency(facility.amountPaid)}</Stat>
           <Stat label="Outstanding">{facility.outstanding != null ? formatCurrency(facility.outstanding) : '—'}</Stat>
@@ -297,7 +318,7 @@ export default function AdminFacilityDetails() {
           </h3>
           <p className="text-sm text-navy-500 mb-4">
             {isLoan
-              ? `Transfer ${formatCurrency(transaction.amount)} to the customer's account below, then record the transfer reference. The repayment schedule starts today.`
+              ? `Transfer ${formatCurrency(facility.payoutAmount ?? transaction.amount)} (the loan after ${formatCurrency(facility.fees?.total || 0)} fees) to the customer's account below, then record the transfer reference. The repayment schedule starts today.`
               : 'Once the item has been handed over, record the delivery note. The repayment schedule starts today.'}
           </p>
           <Button icon={isLoan ? Banknote : Truck} onClick={() => { setReference(''); setDisburseOpen(true) }}>
@@ -414,11 +435,48 @@ export default function AdminFacilityDetails() {
                 </p>
               ) : preview && rate !== '' && (
                 <p className="rounded-xl bg-emerald-50/60 border border-emerald-100 px-4 py-3 text-sm text-navy-700">
-                  Customer repays <strong>{formatCurrency(preview.total)}</strong>: {preview.count} {frequencyLabel(facility.repaymentFrequency).toLowerCase()} instalment{preview.count === 1 ? '' : 's'} of about{' '}
+                  {preview.payout != null && <>Customer receives <strong>{formatCurrency(preview.payout)}</strong> after fees and repays </>}
+                  {preview.payout == null && <>Customer repays </>}
+                  <strong>{formatCurrency(preview.total)}</strong>{preview.payout == null && feePreview ? ' (fees included)' : ''}: {preview.count} {frequencyLabel(facility.repaymentFrequency).toLowerCase()} instalment{preview.count === 1 ? '' : 's'} of about{' '}
                   <strong>{formatCurrency(preview.each)}</strong>.
                 </p>
               )}
             </>
+          )}
+          {dialog?.kind === 'application' && dialog.action === 'approve' && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Input
+                label="Legal Fee (%)"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={fees.legalPercent}
+                onChange={(e) => setFees((f) => ({ ...f, legalPercent: e.target.value }))}
+                hint={feePreview ? formatCurrency(feePreview.legal) : undefined}
+              />
+              <Input
+                label="Inspection Fee (₦)"
+                type="number"
+                min="0"
+                value={fees.inspection}
+                onChange={(e) => setFees((f) => ({ ...f, inspection: e.target.value }))}
+                hint="Depends on the customer’s location."
+              />
+              <Input
+                label="Application Fee (₦)"
+                type="number"
+                min="0"
+                value={fees.application}
+                onChange={(e) => setFees((f) => ({ ...f, application: e.target.value }))}
+              />
+              {feePreview && (
+                <p className="sm:col-span-3 text-xs text-navy-500">
+                  Fees total <strong>{formatCurrency(feePreview.total)}</strong>,{' '}
+                  {isLoan ? 'taken from the loan when it’s paid out.' : 'added to the customer’s repayments.'}
+                </p>
+              )}
+            </div>
           )}
           <Input
             label={dialog?.action === 'reject' ? 'Reason' : 'Note (optional)'}
@@ -434,7 +492,7 @@ export default function AdminFacilityDetails() {
         onClose={() => setDisburseOpen(false)}
         title={isLoan ? 'Record Payout' : 'Record Delivery'}
         subtitle={isLoan
-          ? `Only after ${formatCurrency(transaction.amount)} has been sent to ${facility.disbursementAccount?.bankName} ${facility.disbursementAccount?.accountNumber}.`
+          ? `Only after ${formatCurrency(facility.payoutAmount ?? transaction.amount)} has been sent to ${facility.disbursementAccount?.bankName} ${facility.disbursementAccount?.accountNumber}.`
           : 'Only after the item has been handed to the customer.'}
         footer={
           <>

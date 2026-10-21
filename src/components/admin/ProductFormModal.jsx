@@ -22,6 +22,7 @@ const EMPTY_FORM = {
   itemCategories: [],
   interestRate: '',
   interestRates: { upfront: '', monthly: '', maturity: '', partial: '' },
+  fees: { legalPercent: '', inspection: '', application: '' },
   status: 'active',
 }
 
@@ -90,6 +91,11 @@ export default function ProductFormModal({ open, onClose, onSave, initialData })
                 maturity: initialData.interestRates?.maturity ?? '',
                 partial: initialData.interestRates?.partial ?? '',
               },
+              fees: {
+                legalPercent: initialData.fees?.legalPercent ?? '',
+                inspection: initialData.fees?.inspection ?? '',
+                application: initialData.fees?.application ?? '',
+              },
             }
           : EMPTY_FORM
       )
@@ -147,6 +153,10 @@ export default function ProductFormModal({ open, onClose, onSave, initialData })
       itemCategories: isHirePurchase ? form.itemCategories : [],
       // Blank: a Super Admin sets the rate when approving each application
       interestRate: isFacility && form.interestRate !== '' ? Number(form.interestRate) : null,
+      // Loans and hire-purchase: a blank fee uses the default
+      ...(isFacility && {
+        fees: Object.fromEntries(Object.entries(form.fees).filter(([, v]) => v !== '').map(([k, v]) => [k, Number(v)])),
+      }),
       // Investments and savings: a blank rate uses the default
       ...(rateFields && {
         interestRates: Object.fromEntries(
@@ -208,6 +218,30 @@ export default function ProductFormModal({ open, onClose, onSave, initialData })
             error={errors.interestRate}
             hint="Charged once on the amount, whatever the term. Leave blank for the default of 13%. A Super Admin can still change it on each application."
           />
+        )}
+        {isFacility && (
+          <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[
+              { key: 'legalPercent', label: 'Legal Fee (%)', hint: 'Of the amount. Default 1%.' },
+              { key: 'inspection', label: 'Inspection Fee (₦)', hint: 'Default ₦2,000; adjust per location when approving.' },
+              { key: 'application', label: 'Application Fee (₦)', hint: 'Default ₦3,000.' },
+            ].map((f) => (
+              <Input
+                key={f.key}
+                label={f.label}
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.fees[f.key]}
+                onChange={(e) => setForm((prev) => ({ ...prev, fees: { ...prev.fees, [f.key]: e.target.value } }))}
+                hint={f.hint}
+              />
+            ))}
+            <p className="sm:col-span-3 text-xs text-navy-400">
+              Loans have the fees taken from the payout; hire-purchase adds them to the repayments. A Super Admin confirms or changes them on each application.
+            </p>
+            {errors.fees && <p className="sm:col-span-3 text-xs text-red-500">{errors.fees}</p>}
+          </div>
         )}
         {rateFields && (
           <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">

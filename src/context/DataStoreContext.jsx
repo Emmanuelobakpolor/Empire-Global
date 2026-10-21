@@ -169,10 +169,15 @@ export function DataStoreProvider({ children }) {
   const recommendPayment = (transactionId, decision, note) =>
     reviewAction(transactionId, 'recommend', { decision, note: note || '' })
 
-  // interestRate: loan and hire-purchase applications, and investments (the product's rate when omitted)
-  const approvePayment = async (transactionId, note, interestRate) => {
+  // interestRate: loan and hire-purchase applications, and investments (the product's rate when omitted).
+  // fees: loans and hire-purchase, { legalFeePercent, inspectionFee, applicationFee } (the product's when omitted)
+  const approvePayment = async (transactionId, note, interestRate, fees = {}) => {
     if (!isSuperAdmin()) return { success: false, error: 'Only a Super Admin can give final approval.' }
-    const body = { note: note || '', ...(interestRate !== undefined && interestRate !== '' && { interestRate: Number(interestRate) }) }
+    const body = {
+      note: note || '',
+      ...(interestRate !== undefined && interestRate !== '' && { interestRate: Number(interestRate) }),
+      ...Object.fromEntries(Object.entries(fees).filter(([, v]) => v !== '' && v != null).map(([k, v]) => [k, Number(v)])),
+    }
     const result = await reviewAction(transactionId, 'approve', body)
     // The customer's balance changed on the server
     if (result.success) refreshCustomers()

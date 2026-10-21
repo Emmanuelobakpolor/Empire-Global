@@ -58,12 +58,26 @@ export function instalmentCount(termMonths, frequency, start = new Date().toISOS
 
 export const repayableTotal = (amount, rate) => Math.round(amount * (1 + rate / 100) * 100) / 100
 
-// Flat interest: a percent of the amount, charged once whatever the term
-export function estimateRepayment(amount, rate, termMonths, frequency) {
+// Legal (a percent of the amount), inspection and application fees in naira
+export function estimateFees(amount, fees) {
+  if (!fees || !amount) return null
+  const legal = Math.round(amount * (fees.legalPercent || 0)) / 100
+  const inspection = Number(fees.inspection) || 0
+  const application = Number(fees.application) || 0
+  return { legalPercent: fees.legalPercent, legal, inspection, application, total: legal + inspection + application }
+}
+
+// Flat interest: a percent of the amount, charged once whatever the term. A loan's fees come off the
+// payout; hire-purchase adds them to what's repaid.
+export function estimateRepayment(amount, rate, termMonths, frequency, fees = null, productType = 'loan') {
   if (rate === null || rate === undefined || !amount || !frequency) return null
-  const total = repayableTotal(amount, rate)
+  const feeTotal = fees?.total || 0
+  const total = repayableTotal(amount, rate) + (productType === 'hire-purchase' ? feeTotal : 0)
   const count = instalmentCount(termMonths, frequency)
-  return { total, count, each: Math.round((total / count) * 100) / 100 }
+  return {
+    total, count, each: Math.round((total / count) * 100) / 100, fees,
+    payout: productType === 'loan' ? amount - feeTotal : null,
+  }
 }
 
 export function daysUntil(dateStr) {

@@ -14,7 +14,7 @@ import {
   documentsComplete, guarantorErrors, nextOfKinErrors, guarantorRows, nextOfKinRows, documentRows, bankAccountRows,
   fromApiPerson, toApiPerson,
 } from '../../components/customer/ApplicationForms'
-import { bankAccountErrors, estimateRepayment, frequencyLabel } from '../../utils/facility'
+import { bankAccountErrors, estimateFees, estimateRepayment, frequencyLabel } from '../../utils/facility'
 import { INTEREST_OPTIONS, interestEstimate, interestOptionLabel, rateLabel } from '../../utils/investment'
 import { useDataStore } from '../../context/DataStoreContext'
 import GeneratingTransaction, { GENERATING_MS } from '../../components/customer/GeneratingTransaction'
@@ -92,7 +92,16 @@ function RepaymentEstimate({ estimate, frequency }) {
         {estimate.count === 1 ? 'once' : `${frequencyLabel(frequency).toLowerCase()} for ${estimate.count} instalments`},{' '}
         <strong className="text-navy-900">{formatCurrency(estimate.total)}</strong> in total.
       </p>
-      <p className="text-xs text-navy-400 mt-1">An estimate. Your exact schedule is set when you receive the funds or item.</p>
+      {estimate.fees && (
+        <p className="mt-1">
+          {estimate.payout != null
+            ? <>You’d receive about <strong className="text-navy-900">{formatCurrency(estimate.payout)}</strong> after {formatCurrency(estimate.fees.total)} in fees.</>
+            : <>Includes {formatCurrency(estimate.fees.total)} in fees.</>}
+        </p>
+      )}
+      <p className="text-xs text-navy-400 mt-1">
+        An estimate. Fees (legal {estimate.fees?.legalPercent}%, inspection depending on your location, and application) and your exact schedule are confirmed on approval.
+      </p>
     </div>
   )
 }
@@ -138,7 +147,8 @@ export default function CreateTransaction() {
   const repaymentOptions = product?.repaymentFrequencies || []
   // Products with one way to repay (e.g. a salary advance on payday) don't ask
   const chosenFrequency = repaymentOptions.length === 1 ? repaymentOptions[0] : repaymentFrequency
-  const estimate = needsApplication ? estimateRepayment(Number(amount), product?.effectiveInterestRate ?? product?.interestRate, termOptions.length > 1 ? termMonths : termOptions[0], chosenFrequency) : null
+  const feeEstimate = needsApplication ? estimateFees(Number(amount), product?.fees) : null
+  const estimate = needsApplication ? estimateRepayment(Number(amount), product?.effectiveInterestRate ?? product?.interestRate, termOptions.length > 1 ? termMonths : termOptions[0], chosenFrequency, feeEstimate, product?.type) : null
   // Single-option products have a fixed term; null termOptions means open-ended
   const chosenTerm = termOptions.length > 1 ? termMonths : termOptions[0] ?? null
   // Savings with a set length earn interest at maturity; open-ended ones don't
@@ -481,6 +491,11 @@ export default function CreateTransaction() {
                 { label: 'Repayment', value: frequencyLabel(chosenFrequency) },
                 { label: 'Duration', value: formatTerm(chosenTerm) },
                 { label: 'Interest', value: (product.effectiveInterestRate ?? product.interestRate) != null ? `${product.effectiveInterestRate ?? product.interestRate}% of the amount (flat)` : 'Set on approval' },
+                ...(feeEstimate ? [{
+                  label: 'Estimated Fees',
+                  value: `${formatCurrency(feeEstimate.total)} (legal ${feeEstimate.legalPercent}%, inspection ${formatCurrency(feeEstimate.inspection)}, application ${formatCurrency(feeEstimate.application)})`,
+                }] : []),
+                ...(estimate?.payout != null ? [{ label: 'Estimated Amount You Receive', value: formatCurrency(estimate.payout) }] : []),
                 ...(estimate ? [{ label: 'Estimated Total to Repay', value: formatCurrency(estimate.total) }] : []),
                 { label: 'Customer', value: user?.fullName },
               ] : [
