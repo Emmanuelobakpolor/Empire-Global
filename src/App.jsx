@@ -55,6 +55,7 @@ import AdminTransactions from './pages/admin/AdminTransactions'
 import AdminTransactionDetails from './pages/admin/AdminTransactionDetails'
 import AdminFacilities from './pages/admin/AdminFacilities'
 import AdminFacilityDetails from './pages/admin/AdminFacilityDetails'
+import AdminAjo from './pages/admin/AdminAjo'
 import AdminProducts from './pages/admin/AdminProducts'
 import Reports from './pages/admin/Reports'
 import BankDetailsPage from './pages/admin/BankDetailsPage'
@@ -132,6 +133,8 @@ export default function App() {
                   <Route path="transactions/:id" element={<AdminTransactionDetails />} />
                   <Route path="facilities" element={<AdminFacilities />} />
                   <Route path="facilities/:id" element={<AdminFacilityDetails />} />
+                  <Route path="ajo" element={<AdminAjo />} />
+                  <Route path="ajo/:id" element={<AdminTransactionDetails />} />
                   <Route path="products" element={<AdminProducts />} />
                   <Route path="reports" element={<Reports />} />
                   <Route path="bank-details" element={<BankDetailsPage />} />

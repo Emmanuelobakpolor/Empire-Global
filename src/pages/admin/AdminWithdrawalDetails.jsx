@@ -116,6 +116,7 @@ export default function AdminWithdrawalDetails() {
             { label: 'Withdrawing', value: formatCurrency(wd.amount) },
             { label: 'Penalty', value: wd.penalty ? formatCurrency(wd.penalty) : '—' },
             ...(wd.interestDeducted ? [{ label: 'Interest forfeited', value: formatCurrency(wd.interestDeducted) }] : []),
+            ...(wd.serviceCharge ? [{ label: 'Ajo service charge', value: formatCurrency(wd.serviceCharge) }] : []),
             { label: 'To pay out', value: formatCurrency(wd.payoutAmount), strong: true },
             { label: 'Pay from', value: formatDate(wd.earliestPayoutDate) },
           ].map((s) => (
@@ -125,7 +126,7 @@ export default function AdminWithdrawalDetails() {
             </div>
           ))}
         </div>
-        {wd.kind === 'full' && <p className="text-xs text-navy-500 mt-3">Whole-plan withdrawal{wd.penalty ? ' (early termination)' : ''}.</p>}
+        {wd.kind === 'full' && <p className="text-xs text-navy-500 mt-3">{wd.productType === 'ajo' ? 'Ajo payout at the end of the cycle.' : `Whole-plan withdrawal${wd.penalty ? ' (early termination)' : ''}.`}</p>}
         {wd.note && <p className="text-sm text-navy-600 mt-3"><strong>Customer's note:</strong> {wd.note}</p>}
         {wd.status === 'rejected' && <p className="text-sm text-red-600 mt-3"><strong>Rejected:</strong> {wd.rejectionReason}</p>}
         {wd.status === 'paid' && <p className="text-sm text-emerald-700 mt-3"><strong>Paid</strong> {formatDate(wd.paidAt, { withTime: true })} · transfer ref {wd.payoutReference}</p>}

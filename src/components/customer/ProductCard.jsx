@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom'
-import { PiggyBank, TrendingUp, Coins, Landmark, ShoppingBag, ArrowRight } from 'lucide-react'
+import { PiggyBank, TrendingUp, Coins, HandCoins, Landmark, ShoppingBag, ArrowRight } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatCurrency'
 
 export const PRODUCT_ICONS = {
   savings: PiggyBank,
   investment: TrendingUp,
   thrift: Coins,
+  ajo: HandCoins,
   loan: Landmark,
   'hire-purchase': ShoppingBag,
 }
@@ -14,6 +15,7 @@ export const PRODUCT_COLORS = {
   savings: 'bg-emerald-50 text-emerald-600',
   investment: 'bg-blue-50 text-blue-600',
   thrift: 'bg-amber-50 text-amber-600',
+  ajo: 'bg-orange-50 text-orange-600',
   loan: 'bg-purple-50 text-purple-600',
   'hire-purchase': 'bg-rose-50 text-rose-600',
 }

@@ -305,6 +305,42 @@
     }
   },
   {
+    "id": "p17",
+    "name": "Ajo Esusu Contribution",
+    "category": "Thrift Savings",
+    "type": "ajo",
+    "description": "Contribute a fixed amount every day or week for a cycle and collect everything you saved at the end, less a service charge of one contribution.",
+    "minAmount": 500,
+    "maxAmount": 1000000,
+    "duration": "1 - 3 months",
+    "termOptions": [
+      1,
+      2,
+      3
+    ],
+    "frequency": "Daily or Weekly",
+    "expectedReturn": null,
+    "benefits": [
+      "Disciplined daily or weekly saving",
+      "Pay by bank transfer or in cash to our staff",
+      "Track every contribution and download your statement",
+      "Access to loan facilities based on your saving history"
+    ],
+    "clauses": [
+      "The contribution amount and how often you contribute are fixed for the whole cycle.",
+      "A service charge of one contribution is taken from your savings at the end of each cycle.",
+      "Your savings are paid out in one sum when the cycle ends, after a payout request is approved.",
+      "Savings cannot be withdrawn before the cycle ends.",
+      "Missed contributions are not carried over; you are paid what you actually saved, less the service charge.",
+      "Cash contributions are only valid when recorded by Empire Global staff."
+    ],
+    "status": "active",
+    "withdrawalRules": {
+      "allowed": true,
+      "payout": "any"
+    }
+  },
+  {
     "id": "p7",
     "name": "Salary Advance",
     "category": "Loan Facilities",

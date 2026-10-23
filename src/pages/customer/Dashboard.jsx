@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { PiggyBank, TrendingUp, Landmark, ShoppingBag, Receipt, ArrowRight, ArrowUpRight, Clock, Sparkles, CalendarClock, ArrowDownToLine } from 'lucide-react'
+import { PiggyBank, TrendingUp, Landmark, ShoppingBag, Receipt, ArrowRight, ArrowUpRight, Clock, Sparkles, CalendarClock, ArrowDownToLine, HandCoins } from 'lucide-react'
 import StatCard from '../../components/ui/StatCard'
 import Card from '../../components/ui/Card'
 import CountUp from '../../components/ui/CountUp'
@@ -41,11 +41,15 @@ export default function Dashboard() {
   // Loans and hire-purchase approved and waiting to be paid out or delivered
   const awaitingDisbursement = allMine.filter((t) => t.facility?.status === 'awaiting_disbursement')
 
-  // Savings and investments approved this month (what actually moved the total balance)
+  // Savings and investments approved this month, and Ajo contributions confirmed this month
+  // (what actually moved the total balance)
   const thisMonth = new Date().toISOString().slice(0, 7)
   const creditedThisMonth = allMine
     .filter((t) => t.status === 'approved' && ['savings', 'thrift', 'investment'].includes(t.productType) && t.date?.startsWith(thisMonth))
     .reduce((sum, t) => sum + t.amount, 0)
+    + allMine.flatMap((t) => t.ajo?.contributions || [])
+      .filter((c) => c.state === 'paid' && c.paidAt?.startsWith(thisMonth))
+      .reduce((sum, c) => sum + c.amount, 0)
 
   // A few live products to explore, from the catalogue
   const featuredProducts = products.filter((p) => p.status === 'active').slice(0, 3)
@@ -60,8 +64,12 @@ export default function Dashboard() {
 
   const savings = account?.savingsBalance || 0
   const investments = account?.investmentBalance || 0
-  const totalBalance = savings + investments
-  const savingsShare = totalBalance ? Math.round((savings / totalBalance) * 100) : 0
+  const ajoBalance = account?.ajoBalance || 0
+  const totalBalance = savings + investments + ajoBalance
+  const share = (value) => (totalBalance ? Math.round((value / totalBalance) * 100) : 0)
+  const savingsShare = share(savings)
+  const ajoShare = share(ajoBalance)
+  const investmentShare = totalBalance ? 100 - savingsShare - ajoShare : 0
 
   const today = new Date().toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long' })
 
@@ -101,14 +109,20 @@ export default function Dashboard() {
                 </div>
                 <div className="mt-3 h-2.5 rounded-full bg-white/10 overflow-hidden flex">
                   <div className="h-full bg-emerald-400 animate-bar-fill" style={{ width: `${savingsShare}%` }} />
-                  <div className="h-full bg-sky-400 animate-bar-fill" style={{ width: `${100 - savingsShare}%`, animationDelay: '0.5s' }} />
+                  <div className="h-full bg-amber-400 animate-bar-fill" style={{ width: `${ajoShare}%`, animationDelay: '0.25s' }} />
+                  <div className="h-full bg-sky-400 animate-bar-fill" style={{ width: `${investmentShare}%`, animationDelay: '0.5s' }} />
                 </div>
                 <div className="mt-3 flex justify-between text-xs">
                   <span className="flex items-center gap-1.5 text-navy-100">
                     <span className="w-2 h-2 rounded-full bg-emerald-400" /> Savings {savingsShare}%
                   </span>
+                  {ajoBalance > 0 && (
+                    <span className="flex items-center gap-1.5 text-navy-100">
+                      <span className="w-2 h-2 rounded-full bg-amber-400" /> Ajo {ajoShare}%
+                    </span>
+                  )}
                   <span className="flex items-center gap-1.5 text-navy-100">
-                    <span className="w-2 h-2 rounded-full bg-sky-400" /> Investments {100 - savingsShare}%
+                    <span className="w-2 h-2 rounded-full bg-sky-400" /> Investments {investmentShare}%
                   </span>
                 </div>
               </div>
@@ -117,8 +131,9 @@ export default function Dashboard() {
         </section>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 stagger-children">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 stagger-children">
         <StatCard label="Savings Balance" value={<CountUp value={savings} />} icon={PiggyBank} tone="emerald" />
+        <StatCard label="Ajo Balance" value={<CountUp value={ajoBalance} />} icon={HandCoins} tone="amber" />
         <StatCard label="Investments" value={<CountUp value={investments} />} icon={TrendingUp} tone="emerald" />
         <StatCard label="Outstanding Loan" value={<CountUp value={account?.outstandingLoan || 0} />} icon={Landmark} tone="amber" />
       </div>

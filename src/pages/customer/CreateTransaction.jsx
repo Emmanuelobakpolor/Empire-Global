@@ -16,6 +16,7 @@ import {
 } from '../../components/customer/ApplicationForms'
 import { bankAccountErrors, estimateFees, estimateRepayment, frequencyLabel } from '../../utils/facility'
 import { INTEREST_OPTIONS, interestEstimate, interestOptionLabel, rateLabel } from '../../utils/investment'
+import { CONTRIBUTION_FREQUENCY, contributionLabel, estimateAjo } from '../../utils/ajo'
 import { useDataStore } from '../../context/DataStoreContext'
 import GeneratingTransaction, { GENERATING_MS } from '../../components/customer/GeneratingTransaction'
 import { useAuth } from '../../context/AuthContext'
@@ -74,6 +75,25 @@ function InterestOptionPicker({ amount, rates, value, onChange }) {
   )
 }
 
+// An Ajo cycle at a glance: what's saved if every contribution is paid, the charge and the payout
+function AjoEstimate({ estimate, frequency }) {
+  if (!estimate) return null
+  return (
+    <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 text-sm text-navy-700">
+      <p>
+        <strong className="text-navy-900">{estimate.count}</strong> {contributionLabel(frequency).toLowerCase()} contributions:{' '}
+        <strong className="text-navy-900">{formatCurrency(estimate.total)}</strong> saved if you pay them all.
+      </p>
+      <p className="mt-1">
+        At the end you collect <strong className="text-navy-900">{formatCurrency(estimate.payout)}</strong>, after the service charge of one contribution ({formatCurrency(estimate.charge)}).
+      </p>
+      <p className="text-xs text-navy-400 mt-1">
+        Your cycle starts today. Pay each contribution in cash to our staff or by transfer; our staff record it and your Ajo balance updates. Your payout is arranged when the cycle ends, and missed contributions aren’t carried over.
+      </p>
+    </div>
+  )
+}
+
 // What the customer can expect to repay, when the product has a set rate
 function RepaymentEstimate({ estimate, frequency }) {
   if (!frequency) return null
@@ -127,6 +147,8 @@ export default function CreateTransaction() {
   const [item, setItem] = useState({ category: '', description: '' })
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [repaymentFrequency, setRepaymentFrequency] = useState('')
+  // Ajo: how often they'll contribute
+  const [contributionFrequency, setContributionFrequency] = useState('')
   // Investments: how interest is paid (upfront, monthly or at maturity)
   const [interestOption, setInterestOption] = useState('')
   // The customer's own account, where a loan is paid out to or investment interest is sent
@@ -142,6 +164,9 @@ export default function CreateTransaction() {
   const needsNextOfKin = NEEDS_NEXT_OF_KIN.includes(product?.type)
   const isHirePurchase = product?.type === 'hire-purchase'
   const isInvestment = product?.type === 'investment'
+  const isAjo = product?.type === 'ajo'
+  const contributionOptions = product?.contributionFrequencies || []
+  const chosenContribution = contributionOptions.length === 1 ? contributionOptions[0] : contributionFrequency
   const hasClauses = product?.clauses?.length > 0
   const termOptions = product?.termOptions || []
   const repaymentOptions = product?.repaymentFrequencies || []
@@ -158,6 +183,7 @@ export default function CreateTransaction() {
   const interest = earnsInterest ? interestEstimate(Number(amount), product?.interestRates?.[chosenOption], chosenOption, isInvestment ? 12 : chosenTerm) : null
   const today = new Date().toISOString().slice(0, 10)
   const period = product ? { start: today, end: chosenTerm ? addMonths(today, chosenTerm) : null } : null
+  const ajoEstimate = isAjo ? estimateAjo(Number(amount), chosenContribution, chosenTerm) : null
 
   const steps = [
     'product',
@@ -184,6 +210,7 @@ export default function CreateTransaction() {
     setItem({ category: '', description: '' })
     setTermMonths(null)
     setRepaymentFrequency('')
+    setContributionFrequency('')
     setInterestOption('')
   }, [productId])
 
@@ -194,7 +221,7 @@ export default function CreateTransaction() {
       return num > 0 && (!product || (num >= product.minAmount && num <= product.maxAmount))
     }
     if (current === 'interest') return !!interestOption
-    if (current === 'plan') return (needsApplication ? !!chosenFrequency : !!planFrequency) && (termOptions.length <= 1 || !!termMonths)
+    if (current === 'plan') return (needsApplication ? !!chosenFrequency : isAjo ? !!chosenContribution : !!planFrequency) && (termOptions.length <= 1 || !!termMonths)
     if (current === 'documents') return documentsComplete(documents, product)
     if (current === 'review' && hasClauses) return acceptedTerms
     return true
@@ -226,6 +253,7 @@ export default function CreateTransaction() {
         disbursementAccount: { ...bankAccount, bankName: bankAccount.bankName.trim(), accountName: bankAccount.accountName.trim() },
       }),
       ...(needsNextOfKin && { nextOfKin: apiNextOfKin }),
+      ...(isAjo && { contributionFrequency: chosenContribution }),
     }, files)
     if (!result.success) {
       // Errors show straight away, without waiting for the animation to finish
@@ -245,7 +273,7 @@ export default function CreateTransaction() {
     if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining))
     setSubmitting(false)
     setReference(result.transaction.reference)
-    showToast(needsApplication ? 'Application submitted successfully.' : 'Transaction reference generated successfully.', 'success')
+    showToast(needsApplication ? 'Application submitted successfully.' : isAjo ? 'You’ve joined. Your Ajo cycle has started.' : 'Transaction reference generated successfully.', 'success')
     return true
   }
 
@@ -308,12 +336,13 @@ export default function CreateTransaction() {
 
         {current === 'amount' && product && (
           <div>
-            <h3 className="text-base font-bold text-navy-900 mb-1">Enter Amount</h3>
+            <h3 className="text-base font-bold text-navy-900 mb-1">{isAjo ? 'Contribution Amount' : 'Enter Amount'}</h3>
             <p className="text-sm text-navy-400 mb-5">
+              {isAjo && 'The fixed amount you’ll pay each time. '}
               Amount must be between {formatCurrency(product.minAmount)} and {formatCurrency(product.maxAmount)}.
             </p>
             <Input
-              label="Amount (₦)"
+              label={isAjo ? 'Each Contribution (₦)' : 'Amount (₦)'}
               type="number"
               placeholder="e.g. 100000"
               value={amount}
@@ -330,6 +359,7 @@ export default function CreateTransaction() {
               {needsApplication
                 ? 'Choose how often you’ll repay and over how long. Repayments start when the '
                   + (isHirePurchase ? 'item is delivered.' : 'loan is paid into your account.')
+                : isAjo ? 'Choose how often you’ll contribute and how long your cycle runs.'
                 : 'Choose your payment frequency and how long the plan should run.'}
             </p>
             <div className="flex flex-col gap-4">
@@ -347,6 +377,20 @@ export default function CreateTransaction() {
                     Repayment: <strong className="text-navy-900">{frequencyLabel(chosenFrequency)}</strong>
                   </div>
                 )
+              ) : isAjo ? (
+                contributionOptions.length > 1 ? (
+                  <Select
+                    label="Contribution Frequency"
+                    value={contributionFrequency}
+                    onChange={(e) => setContributionFrequency(e.target.value)}
+                    options={contributionOptions.map((f) => ({ value: f, label: `${contributionLabel(f)} (${formatCurrency(Number(amount))} ${CONTRIBUTION_FREQUENCY[f]?.per})` }))}
+                    placeholder="Choose how often you'll contribute"
+                  />
+                ) : (
+                  <div className="rounded-xl bg-navy-50/60 px-4 py-3 text-sm text-navy-600">
+                    Contributions: <strong className="text-navy-900">{contributionLabel(chosenContribution)}</strong>
+                  </div>
+                )
               ) : (
                 <Select
                   label="Payment Frequency"
@@ -358,7 +402,7 @@ export default function CreateTransaction() {
               )}
               {termOptions.length > 1 ? (
                 <Select
-                  label="Plan Duration"
+                  label={isAjo ? 'Cycle Length' : 'Plan Duration'}
                   value={termMonths ? String(termMonths) : ''}
                   onChange={(e) => setTermMonths(Number(e.target.value))}
                   options={termOptions.map((m) => ({ value: String(m), label: formatTerm(m) }))}
@@ -370,7 +414,8 @@ export default function CreateTransaction() {
                 </div>
               )}
               {needsApplication && <RepaymentEstimate estimate={estimate} frequency={chosenFrequency} />}
-              {period?.end && !needsApplication && (
+              {isAjo && <AjoEstimate estimate={ajoEstimate} frequency={chosenContribution} />}
+              {period?.end && !needsApplication && !isAjo && (
                 <p className="text-sm text-navy-500">
                   Runs from <strong className="text-navy-900">{formatDate(period.start)}</strong> to{' '}
                   <strong className="text-navy-900">{formatDate(period.end)}</strong>.
@@ -500,8 +545,17 @@ export default function CreateTransaction() {
               ] : [
                 { label: 'Product', value: product.name },
                 { label: 'Type', value: productTypes.find((t) => t.value === product.type)?.label },
-                { label: 'Amount', value: formatCurrency(Number(amount)) },
-                ...(isInvestment ? [] : [{ label: 'Payment Frequency', value: planFrequency }]),
+                ...(isAjo ? [
+                  { label: 'Each Contribution', value: formatCurrency(Number(amount)) },
+                  { label: 'Contribution Frequency', value: contributionLabel(chosenContribution) },
+                  ...(ajoEstimate ? [
+                    { label: 'Contributions in the Cycle', value: String(ajoEstimate.count) },
+                    { label: 'Saved If All Are Paid', value: formatCurrency(ajoEstimate.total) },
+                    { label: 'Service Charge', value: `${formatCurrency(ajoEstimate.charge)} (one contribution)` },
+                    { label: 'You Collect at the End', value: formatCurrency(ajoEstimate.payout) },
+                  ] : []),
+                ] : [{ label: 'Amount', value: formatCurrency(Number(amount)) }]),
+                ...(isInvestment || isAjo ? [] : [{ label: 'Payment Frequency', value: planFrequency }]),
                 ...(earnsInterest ? [
                   { label: 'Interest', value: `${interestOptionLabel(chosenOption)} · ${rateLabel(chosenOption, product.interestRates?.[chosenOption])}` },
                   ...(interest ? [{ label: 'Total Interest', value: formatCurrency(interest.total) }] : []),
@@ -570,10 +624,11 @@ export default function CreateTransaction() {
                 <Check size={30} />
               </span>
             </div>
-            <h3 className="text-lg font-bold text-navy-900">{needsApplication ? 'Application Submitted' : 'Transaction Reference Generated'}</h3>
+            <h3 className="text-lg font-bold text-navy-900">{needsApplication ? 'Application Submitted' : isAjo ? 'Your Ajo Cycle Has Started' : 'Transaction Reference Generated'}</h3>
             <p className="text-sm text-navy-400 mt-1">
               {needsApplication
                 ? 'We’ll review your application and notify you. There’s nothing to pay now.'
+                : isAjo ? 'Pay your contributions to our staff or by transfer. You can follow your Ajo balance on your plan and dashboard.'
                 : 'Your transaction has been created successfully.'}
             </p>
             <div className="bg-navy-900 rounded-xl px-6 py-4 mt-5 w-full">
@@ -600,9 +655,9 @@ export default function CreateTransaction() {
               className="mt-6"
               fullWidth
               size="lg"
-              onClick={() => navigate(needsApplication ? `/customer/transactions/${reference}` : `/customer/payment?ref=${reference}`)}
+              onClick={() => navigate(needsApplication || isAjo ? `/customer/transactions/${reference}` : `/customer/payment?ref=${reference}`)}
             >
-              {needsApplication ? 'View My Application' : 'Continue to Payment Instructions'}
+              {needsApplication ? 'View My Application' : isAjo ? 'View My Ajo Plan' : 'Continue to Payment Instructions'}
             </Button>
           </div>
         )}
@@ -614,7 +669,7 @@ export default function CreateTransaction() {
             Back
           </Button>
           <Button icon={ChevronRight} iconPosition="right" onClick={handleNext} disabled={!canGoNext()} loading={submitting}>
-            {current === 'review' ? (needsApplication ? 'Submit Application' : 'Generate Transaction') : 'Continue'}
+            {current === 'review' ? (needsApplication ? 'Submit Application' : isAjo ? 'Join Ajo' : 'Generate Transaction') : 'Continue'}
           </Button>
         </div>
       )}

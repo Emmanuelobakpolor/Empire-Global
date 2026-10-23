@@ -16,6 +16,7 @@ import {
   BadgeCheck,
   HandCoins,
   Coins,
+  PiggyBank,
 } from 'lucide-react'
 import Logo from '../Logo'
 import { useAdminAuth } from '../../context/AdminAuthContext'
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { to: '/admin/agents', label: 'Agents', icon: BadgeCheck },
   { to: '/admin/payments', label: 'Payments', icon: Wallet },
   { to: '/admin/facilities', label: 'Loans & Hire-Purchase', icon: HandCoins },
+  { to: '/admin/ajo', label: 'Ajo (Esusu)', icon: PiggyBank },
   { to: '/admin/withdrawals', label: 'Withdrawals', icon: ArrowDownToLine },
   { to: '/admin/interest-payouts', label: 'Interest Payouts', icon: Coins },
   { to: '/admin/transactions', label: 'Transactions', icon: Receipt },

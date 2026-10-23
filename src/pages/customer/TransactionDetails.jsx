@@ -11,6 +11,8 @@ import PlanPeriodCard from '../../components/PlanPeriod'
 import PaymentAccountCard from '../../components/customer/PaymentAccountCard'
 import FacilityPanel from '../../components/customer/FacilityPanel'
 import InvestmentPanel from '../../components/customer/InvestmentPanel'
+import AjoPanel from '../../components/customer/AjoPanel'
+import { AJO_STATE, contributionLabel } from '../../utils/ajo'
 import { facilityStatus, frequencyLabel } from '../../utils/facility'
 import { useDataStore } from '../../context/DataStoreContext'
 import { formatCurrency } from '../../utils/formatCurrency'
@@ -36,8 +38,11 @@ export default function TransactionDetails() {
 
   // Loans and hire-purchase are applied for, paid out, then repaid by instalment
   const facility = transaction.facility
+  // Ajo plans follow their cycle once the first contribution is approved
+  const ajo = transaction.ajo
   const badge = facility
     ? facilityStatus(transaction)
+    : ajo && transaction.status === 'approved' ? AJO_STATE[ajo.state]
     : transaction.status === 'draft' ? { badge: 'awaiting', label: 'Awaiting payment' } : { badge: transaction.status, label: transaction.status }
 
   return (
@@ -78,6 +83,11 @@ export default function TransactionDetails() {
               <p className="text-xs text-navy-400 flex items-center gap-1"><FileText size={12} /> Repayment</p>
               <p className="text-sm font-bold text-navy-900 mt-1">{frequencyLabel(facility.repaymentFrequency)}</p>
             </div>
+          ) : ajo ? (
+            <div>
+              <p className="text-xs text-navy-400 flex items-center gap-1"><FileText size={12} /> Contributions</p>
+              <p className="text-sm font-bold text-navy-900 mt-1">{contributionLabel(ajo.frequency)}</p>
+            </div>
           ) : (
             <div>
               <p className="text-xs text-navy-400 flex items-center gap-1"><FileText size={12} /> Receipt</p>
@@ -107,13 +117,13 @@ export default function TransactionDetails() {
         </>
       )}
 
-      {!facility && <PlanPeriodCard transaction={transaction} />}
+      {ajo ? <AjoPanel transaction={transaction} /> : !facility && <PlanPeriodCard transaction={transaction} />}
 
       {transaction.investment && <InvestmentPanel transaction={transaction} />}
 
       {transaction.receipt && (
         <Card className="mb-6">
-          <h3 className="text-sm font-bold text-navy-800 mb-4">Your Receipt</h3>
+          <h3 className="text-sm font-bold text-navy-800 mb-4">{ajo ? 'First Contribution Receipt' : 'Your Receipt'}</h3>
           <ReceiptPreview receipt={transaction.receipt} />
         </Card>
       )}

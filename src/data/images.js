@@ -39,6 +39,7 @@ export const PRODUCT_IMAGES = {
   savings: unsplash('1579621970795-87facc2f976d', 800),
   investment: unsplash('1590283603385-17ffb3a7f29f', 800),
   thrift: unsplash('1591696205602-2f950c417cb9', 800),
+  ajo: unsplash('1591696205602-2f950c417cb9', 800),
   loan: unsplash('1450101499163-c8848c66ca85', 800),
   'hire-purchase': unsplash('1441986300917-64674bd600d8', 800),
 }

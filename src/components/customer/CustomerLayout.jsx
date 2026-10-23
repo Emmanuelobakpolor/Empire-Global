@@ -13,7 +13,12 @@ export default function CustomerLayout() {
   const { user } = useAuth()
   const { ensureCustomer, refreshTransactions } = useDataStore()
   const { refresh: refreshSession } = useSession()
-  useNotificationPolling()
+  // Something happened on the server (a contribution confirmed, a payment approved): reload the
+  // plans and balances so open pages update without the customer doing anything
+  useNotificationPolling(() => {
+    refreshTransactions('customer')
+    refreshSession()
+  })
 
   useEffect(() => {
     ensureCustomer(user)

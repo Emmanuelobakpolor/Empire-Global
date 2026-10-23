@@ -10,7 +10,7 @@ import TransactionTable from '../../components/customer/TransactionTable'
 import { useDataStore } from '../../context/DataStoreContext'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatDate } from '../../utils/formatDate'
-import { PiggyBank, TrendingUp, Landmark, BadgeCheck, Users } from 'lucide-react'
+import { PiggyBank, TrendingUp, Landmark, BadgeCheck, Users, HandCoins } from 'lucide-react'
 import { DetailList, nextOfKinRows } from '../../components/customer/ApplicationForms'
 import { AgentCell } from '../../components/admin/AgentFilter'
 
@@ -71,9 +71,10 @@ export default function CustomerDetails() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 stagger-children">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6 stagger-children">
         <StatCard label="Savings" value={formatCurrency(customer.savingsBalance)} icon={PiggyBank} tone="emerald" />
         <StatCard label="Investments" value={formatCurrency(customer.investmentBalance)} icon={TrendingUp} tone="navy" />
+        <StatCard label="Ajo" value={formatCurrency(customer.ajoBalance || 0)} icon={HandCoins} tone="emerald" />
         <StatCard label="Outstanding Loan" value={formatCurrency(customer.outstandingLoan)} icon={Landmark} tone="amber" />
         <StatCard label="Transaction Count" value={customerTransactions.length} icon={Receipt} tone="navy" />
       </div>

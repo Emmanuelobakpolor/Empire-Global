@@ -5,6 +5,7 @@ export const productTypes = [
   { value: 'savings', label: 'Savings' },
   { value: 'investment', label: 'Investment' },
   { value: 'thrift', label: 'Thrift' },
+  { value: 'ajo', label: 'Ajo (Esusu)' },
   { value: 'loan', label: 'Loan' },
   { value: 'hire-purchase', label: 'Hire Purchase' },
 ]

@@ -12,6 +12,7 @@ import ApplicationDetails from '../../components/admin/ApplicationDetails'
 import PlanPeriodCard from '../../components/PlanPeriod'
 import InvestmentPanel from '../../components/customer/InvestmentPanel'
 import RecordInterestModal from '../../components/admin/RecordInterestModal'
+import AjoAdminPanel from '../../components/admin/AjoAdminPanel'
 import { useDataStore } from '../../context/DataStoreContext'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatDate } from '../../utils/formatDate'
@@ -79,13 +80,13 @@ export default function AdminTransactionDetails() {
         )}
       </Card>
 
-      <PlanPeriodCard transaction={transaction} />
+      {transaction.ajo ? <AjoAdminPanel transaction={transaction} /> : <PlanPeriodCard transaction={transaction} />}
 
       {transaction.investment && <InvestmentPanel transaction={transaction} onRecord={setRecording} />}
 
       {transaction.receipt && (
         <Card className="mb-6">
-          <h3 className="text-sm font-bold text-navy-800 mb-4">Payment Receipt</h3>
+          <h3 className="text-sm font-bold text-navy-800 mb-4">{transaction.ajo ? 'First Contribution Receipt' : 'Payment Receipt'}</h3>
           <ReceiptPreview receipt={transaction.receipt} />
         </Card>
       )}

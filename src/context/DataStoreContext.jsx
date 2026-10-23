@@ -234,6 +234,29 @@ export function DataStoreProvider({ children }) {
     return result
   }
 
+  // ---- Ajo contributions ----
+  // Customers only watch their Ajo: staff record every contribution (cash or transfer) and a Super
+  // Admin's confirmation credits the customer's Ajo balance on the server.
+
+  // action: 'record' (any admin, body { method, receivedOn, reference, note }) | 'recommend' (body { decision, note })
+  // | 'approve' | 'reject' (Super Admin, body { note })
+  const contributionAction = async (contributionId, action, body = {}) => {
+    const result = await call(`/admin/contributions/${contributionId}/${action}/`, { method: 'POST', body }, { audited: true })
+    if (result.success) {
+      replaceTransaction(result.transaction)
+      refreshCustomers()
+    }
+    return result
+  }
+
+  // Once the cycle ends, an admin starts the payout: a withdrawal of what was saved less the charge,
+  // which then goes through the usual approval. body: { bankName, accountNumber, accountName, note }
+  const arrangeAjoPayout = async (transactionId, body) => {
+    const result = await reviewAction(transactionId, 'payout', body)
+    if (result.success) refreshWithdrawals('admin')
+    return result
+  }
+
   // ---- Withdrawals ----
   // Customers request from a plan; an admin recommends, a Super Admin approves (the balance is
   // deducted on the server) or rejects, and an admin marks it paid with the transfer reference.
@@ -364,7 +387,7 @@ export function DataStoreProvider({ children }) {
 
   // ---- Customers ----
   // Account fields (identity, status, next of kin, balances) follow the server.
-  const EMPTY_BALANCES = { savingsBalance: 0, investmentBalance: 0, outstandingLoan: 0, totalBalance: 0 }
+  const EMPTY_BALANCES = { savingsBalance: 0, investmentBalance: 0, ajoBalance: 0, outstandingLoan: 0, totalBalance: 0 }
 
   const mergeCustomer = (local, account) => ({
     ...EMPTY_BALANCES,
@@ -384,6 +407,7 @@ export function DataStoreProvider({ children }) {
     ...(account.savingsBalance !== undefined && {
       savingsBalance: account.savingsBalance,
       investmentBalance: account.investmentBalance,
+      ajoBalance: account.ajoBalance ?? 0,
       outstandingLoan: account.outstandingLoan,
       totalBalance: account.totalBalance,
     }),
@@ -527,6 +551,8 @@ export function DataStoreProvider({ children }) {
     recordInterestPayment,
     uploadRepaymentReceipt,
     repaymentAction,
+    contributionAction,
+    arrangeAjoPayout,
     refreshWithdrawals,
     getWithdrawablePlans,
     quoteWithdrawal,

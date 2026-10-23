@@ -6,7 +6,8 @@ const POLL_MS = 30 * 1000
 
 // Keeps the bell up to date: checks for new notifications every 30s while the tab is
 // visible (and straight away when it becomes visible), and pops a toast for anything new.
-export function useNotificationPolling() {
+// `onNew` runs whenever something new arrives, so the page can reload what it changed.
+export function useNotificationPolling(onNew) {
   const { notifications, refreshNotifications } = useDataStore()
   const { showToast } = useToast()
   // Ids already shown; null until the first load, which never toasts
@@ -31,6 +32,7 @@ export function useNotificationPolling() {
     if (!seen.current) return
     const fresh = notifications.filter((n) => !n.read && !seen.current.has(n.id))
     notifications.forEach((n) => seen.current.add(n.id))
+    if (fresh.length) onNew?.()
     if (fresh.length === 1) showToast(`${fresh[0].title}: ${fresh[0].message}`, fresh[0].type === 'error' ? 'error' : 'info')
     else if (fresh.length > 1) showToast(`You have ${fresh.length} new notifications.`, 'info')
   }, [notifications])
