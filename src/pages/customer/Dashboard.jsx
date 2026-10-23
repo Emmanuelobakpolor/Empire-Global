@@ -16,6 +16,7 @@ import { productTypes } from '../../data/products'
 
 const QUICK_ACTIONS = [
   { to: '/customer/savings', label: 'Start Saving', icon: PiggyBank },
+  { to: '/customer/ajo', label: 'Join Ajo', icon: HandCoins },
   { to: '/customer/investments', label: 'Invest', icon: TrendingUp },
   { to: '/customer/loans', label: 'Apply for Loan', icon: Landmark },
   { to: '/customer/hire-purchase', label: 'Hire Purchase', icon: ShoppingBag },
@@ -140,7 +141,7 @@ export default function Dashboard() {
 
       <Card className="mb-6 animate-rise-in">
         <h3 className="text-sm font-bold text-navy-800 mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 stagger-pop">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 stagger-pop">
           {QUICK_ACTIONS.map((action) => (
             <Link
               key={action.to}

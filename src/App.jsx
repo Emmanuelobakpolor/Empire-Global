@@ -34,6 +34,7 @@ import Profile from './pages/customer/Profile'
 import Notifications from './pages/customer/Notifications'
 import Withdrawals from './pages/customer/Withdrawals'
 import Savings from './pages/customer/Savings'
+import Ajo from './pages/customer/Ajo'
 import Investments from './pages/customer/Investments'
 import Loans from './pages/customer/Loans'
 import HirePurchase from './pages/customer/HirePurchase'
@@ -103,6 +104,7 @@ export default function App() {
                   <Route path="transactions" element={<Transactions />} />
                   <Route path="transactions/:id" element={<TransactionDetails />} />
                   <Route path="savings" element={<Savings />} />
+                  <Route path="ajo" element={<Ajo />} />
                   <Route path="investments" element={<Investments />} />
                   <Route path="loans" element={<Loans />} />
                   <Route path="hire-purchase" element={<HirePurchase />} />
