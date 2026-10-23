@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Search, Eye, Ban, CheckCircle, MoreVertical } from 'lucide-react'
+import { Search, Eye, Ban, CheckCircle, MoreVertical, UserPlus } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import Input from '../../components/ui/Input'
 import Select from '../../components/ui/Select'
@@ -9,6 +9,8 @@ import Badge from '../../components/ui/Badge'
 import Avatar from '../../components/ui/Avatar'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import AgentFilter, { AgentCell, useAgentFilter } from '../../components/admin/AgentFilter'
+import RegisterCustomerModal from '../../components/admin/RegisterCustomerModal'
+import Button from '../../components/ui/Button'
 import { useDataStore } from '../../context/DataStoreContext'
 import { useToast } from '../../context/ToastContext'
 import { formatDate } from '../../utils/formatDate'
@@ -26,6 +28,7 @@ export default function Customers() {
   const [statusFilter, setStatusFilter] = useState('')
   const [confirmTarget, setConfirmTarget] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [registering, setRegistering] = useState(false)
 
   useEffect(() => {
     refreshCustomers().then((result) => {
@@ -66,7 +69,11 @@ export default function Customers() {
 
   return (
     <div>
-      <PageHeader title="Customers" subtitle="Manage all registered Empire Global customers." />
+      <PageHeader
+        title="Customers"
+        subtitle="Manage all registered Empire Global customers."
+        actions={<Button variant="accent" icon={UserPlus} onClick={() => setRegistering(true)}>Register Customer</Button>}
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         <Input placeholder="Search name, email, ID or agent..." icon={Search} value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -84,7 +91,7 @@ export default function Customers() {
                 {c.fullName}
               </span>
             </Td>
-            <Td>{c.email}</Td>
+            <Td>{c.hasEmail === false ? <span className="text-navy-400">No email</span> : c.email}</Td>
             <Td>{c.phone}</Td>
             <Td><AgentCell code={c.agentCode} /></Td>
             <Td><Badge status={c.status}>{c.status}</Badge></Td>
@@ -106,6 +113,8 @@ export default function Customers() {
           </Tr>
         ))}
       </Table>
+
+      <RegisterCustomerModal open={registering} onClose={() => setRegistering(false)} />
 
       <ConfirmDialog
         open={!!confirmTarget}

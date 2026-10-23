@@ -402,6 +402,8 @@ export function DataStoreProvider({ children }) {
     avatarUrl: account.avatarUrl ?? null,
     // The customer's own session doesn't report status changes made by admins
     ...(account.status && { status: account.status }),
+    // Registered by staff without an email: no app access
+    hasEmail: account.hasEmail ?? local?.hasEmail ?? true,
     nextOfKin: account.nextOfKin ?? local?.nextOfKin ?? null,
     // Balances change only when a Super Admin approves a payment on the server
     ...(account.savingsBalance !== undefined && {
@@ -452,6 +454,27 @@ export function DataStoreProvider({ children }) {
         customers: prev.customers.map((c) => (c.id === id ? mergeCustomer(c, result.customer) : c)),
       }))
     }
+    return result
+  }
+
+  // Staff register a customer (e.g. an Ajo customer paying cash), optionally starting their Ajo plan
+  // in the same step: body { fullName, phone, email, agentCode, ajo? }
+  const registerCustomer = async (body) => {
+    const result = await call('/admin/customers/', { method: 'POST', body }, { audited: true })
+    if (result.success) {
+      setStore((prev) => ({
+        ...prev,
+        customers: [mergeCustomer(null, result.customer), ...prev.customers],
+        transactions: result.transaction ? [result.transaction, ...prev.transactions] : prev.transactions,
+      }))
+    }
+    return result
+  }
+
+  // Staff start an Ajo plan for a registered customer: body { productId, amount, contributionFrequency, termMonths, termsAccepted }
+  const startAjoPlan = async (customerId, body) => {
+    const result = await call(`/admin/customers/${customerId}/ajo/`, { method: 'POST', body }, { audited: true })
+    if (result.success) setStore((prev) => ({ ...prev, transactions: [result.transaction, ...prev.transactions] }))
     return result
   }
 
@@ -571,6 +594,8 @@ export function DataStoreProvider({ children }) {
     deleteAdmin,
     ensureCustomer,
     refreshCustomers,
+    registerCustomer,
+    startAjoPlan,
     suspendCustomer,
     updateCustomer,
     refreshBankAccounts,

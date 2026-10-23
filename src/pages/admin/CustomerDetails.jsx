@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ChevronLeft, Mail, Phone, Calendar, Receipt } from 'lucide-react'
 import Card from '../../components/ui/Card'
@@ -13,12 +14,14 @@ import { formatDate } from '../../utils/formatDate'
 import { PiggyBank, TrendingUp, Landmark, BadgeCheck, Users, HandCoins } from 'lucide-react'
 import { DetailList, nextOfKinRows } from '../../components/customer/ApplicationForms'
 import { AgentCell } from '../../components/admin/AgentFilter'
+import { StartAjoModal } from '../../components/admin/AjoPlanForm'
 
 export default function CustomerDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { customers, transactions } = useDataStore()
   const customer = customers.find((c) => c.id === id)
+  const [startingAjo, setStartingAjo] = useState(false)
 
   if (!customer) {
     return (
@@ -46,11 +49,19 @@ export default function CustomerDetails() {
               <p className="text-xs text-navy-400 font-mono">{customer.id}</p>
             </div>
           </div>
-          <Badge status={customer.status} className="!text-sm !px-3 !py-1.5 self-start sm:self-auto">{customer.status}</Badge>
+          <div className="flex items-center gap-3 self-start sm:self-auto">
+            {customer.status === 'active' && (
+              <Button variant="accent" size="sm" icon={HandCoins} onClick={() => setStartingAjo(true)}>Start Ajo Plan</Button>
+            )}
+            <Badge status={customer.status} className="!text-sm !px-3 !py-1.5">{customer.status}</Badge>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-navy-50 text-sm">
-          <div className="flex items-center gap-2 text-navy-600"><Mail size={15} className="text-navy-300" /> {customer.email}</div>
+          <div className="flex items-center gap-2 text-navy-600">
+            <Mail size={15} className="text-navy-300" />
+            {customer.hasEmail === false ? <span className="text-navy-400">No email · registered by staff, no app access</span> : customer.email}
+          </div>
           <div className="flex items-center gap-2 text-navy-600"><Phone size={15} className="text-navy-300" /> {customer.phone}</div>
           <div className="flex items-center gap-2 text-navy-600"><Calendar size={15} className="text-navy-300" /> Joined {formatDate(customer.joined)}</div>
         </div>
@@ -78,6 +89,8 @@ export default function CustomerDetails() {
         <StatCard label="Outstanding Loan" value={formatCurrency(customer.outstandingLoan)} icon={Landmark} tone="amber" />
         <StatCard label="Transaction Count" value={customerTransactions.length} icon={Receipt} tone="navy" />
       </div>
+
+      <StartAjoModal customer={customer} open={startingAjo} onClose={() => setStartingAjo(false)} />
 
       <h3 className="text-sm font-bold text-navy-800 mb-4">Transaction History</h3>
       <TransactionTable transactions={customerTransactions} basePath="/admin/transactions" />
