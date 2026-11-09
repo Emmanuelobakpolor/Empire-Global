@@ -35,6 +35,9 @@ services:
       # The Vercel site, e.g. https://empire-global.vercel.app (no trailing slash)
       - key: FRONTEND_URL
         sync: false
+      # Other addresses of the same site, comma-separated, e.g. https://empireglobalng.com,https://empire-global.vercel.app
+      - key: FRONTEND_EXTRA_ORIGINS
+        sync: false
       # cloudinary://<api_key>:<api_secret>@<cloud_name>
       - key: CLOUDINARY_URL
         sync: false
