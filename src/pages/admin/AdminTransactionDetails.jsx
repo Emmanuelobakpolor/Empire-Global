@@ -13,6 +13,7 @@ import PlanPeriodCard from '../../components/PlanPeriod'
 import InvestmentPanel from '../../components/customer/InvestmentPanel'
 import RecordInterestModal from '../../components/admin/RecordInterestModal'
 import AjoAdminPanel from '../../components/admin/AjoAdminPanel'
+import ContractAmendments from '../../components/admin/ContractAmendments'
 import { useDataStore } from '../../context/DataStoreContext'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { formatDate } from '../../utils/formatDate'
@@ -81,6 +82,8 @@ export default function AdminTransactionDetails() {
       </Card>
 
       {transaction.ajo ? <AjoAdminPanel transaction={transaction} /> : <PlanPeriodCard transaction={transaction} />}
+
+      {!transaction.facility && <ContractAmendments transaction={transaction} />}
 
       {transaction.investment && <InvestmentPanel transaction={transaction} onRecord={setRecording} />}
 

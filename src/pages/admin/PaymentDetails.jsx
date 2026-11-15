@@ -15,6 +15,7 @@ import LoadingState from '../../components/ui/LoadingState'
 import ReceiptPreview from '../../components/ReceiptPreview'
 import { AgentCell } from '../../components/admin/AgentFilter'
 import ApplicationDetails from '../../components/admin/ApplicationDetails'
+import ContractAmendments from '../../components/admin/ContractAmendments'
 import PlanPeriodCard from '../../components/PlanPeriod'
 import InvestmentPanel from '../../components/customer/InvestmentPanel'
 import { interestEstimate, interestOptionLabel } from '../../utils/investment'
@@ -168,6 +169,8 @@ export default function PaymentDetails() {
       </Card>
 
       <PlanPeriodCard transaction={transaction} />
+
+      <ContractAmendments transaction={transaction} />
 
       {investment && <InvestmentPanel transaction={transaction} />}
 

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   CheckCircle2, XCircle, ThumbsUp, ThumbsDown, ChevronDown, ChevronUp, Banknote, PenLine, Eye, Send,
 } from 'lucide-react'
@@ -124,7 +125,7 @@ function ContributionRow({ contribution, canRecord, isSuperAdmin, onAction, onRe
 
 const today = () => new Date().toISOString().slice(0, 10)
 
-// An Ajo plan as admins run it: confirm receipts, record cash and transfers, and see the statement
+// An Ajo plan as admins run it: record cash and transfers, confirm them, arrange withdrawals and see the statement
 export default function AjoAdminPanel({ transaction }) {
   const { contributionAction, arrangeAjoPayout } = useDataStore()
   const { isSuperAdmin } = useAdminAuth()
@@ -139,6 +140,7 @@ export default function AjoAdminPanel({ transaction }) {
   const [busy, setBusy] = useState(false)
   const [payoutOpen, setPayoutOpen] = useState(false)
   const [payoutAccount, setPayoutAccount] = useState(EMPTY_BANK_ACCOUNT)
+  const [payoutAmount, setPayoutAmount] = useState('')
 
   const ajo = transaction.ajo
   const state = AJO_STATE[ajo.state]
@@ -190,16 +192,19 @@ export default function AjoAdminPanel({ transaction }) {
 
   const openPayout = () => {
     setPayoutAccount({ ...EMPTY_BANK_ACCOUNT, accountName: transaction.customerName })
+    setPayoutAmount(String(ajo.available))
     setErrors({})
     setPayoutOpen(true)
   }
 
   const submitPayout = async () => {
     const accountErrors = bankAccountErrors(payoutAccount)
+    if (!(Number(payoutAmount) > 0)) accountErrors.amount = 'Enter the amount to withdraw.'
     setErrors(accountErrors)
     if (Object.keys(accountErrors).length) return
     setBusy(true)
     const result = await arrangeAjoPayout(transaction.id, {
+      amount: Number(payoutAmount),
       bankName: payoutAccount.bankName.trim(), accountNumber: payoutAccount.accountNumber.trim(), accountName: payoutAccount.accountName.trim(),
     })
     setBusy(false)
@@ -209,7 +214,7 @@ export default function AjoAdminPanel({ transaction }) {
       return
     }
     setPayoutOpen(false)
-    showToast('Payout arranged. It now goes through withdrawal approval.', 'success')
+    showToast('Withdrawal arranged. It now goes through withdrawal approval.', 'success')
   }
 
   const dialogTitle = dialog && (dialog.action === 'approve' ? 'Confirm Contribution'
@@ -224,24 +229,28 @@ export default function AjoAdminPanel({ transaction }) {
           <Badge status={state.badge} className="!normal-case">{state.label}</Badge>
         </div>
         <AjoSummary transaction={transaction} />
-        {ajo.state === 'ended' && (
-          <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        {ajo.netPayout > 0 && (
+          <div className={`mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm ${ajo.state === 'ended' ? 'bg-amber-50 text-amber-800' : 'bg-navy-50/70 text-navy-700'}`}>
             <p>
-              The cycle has ended. Pay out {formatCurrency(ajo.netPayout)} ({formatCurrency(ajo.saved)} saved, less the {formatCurrency(ajo.serviceCharge)} service charge).
-              {toReview.length > 0 && ' Confirm or reject the contributions waiting below first.'}
+              {ajo.state === 'ended' && 'The cycle has ended. '}
+              {formatCurrency(ajo.netPayout)} can be withdrawn
+              {ajo.chargeDue > 0 && ` (${formatCurrency(ajo.available)} saved, less the ${formatCurrency(ajo.chargeDue)} service charge)`}.
+              The customer can request it in the app, or you can arrange it for them.
             </p>
-            <Button size="sm" variant="accent" icon={Send} onClick={openPayout} disabled={toReview.length > 0 || ajo.saved <= 0} className="shrink-0">
-              Arrange Payout
+            <Button size="sm" variant="accent" icon={Send} onClick={openPayout} className="shrink-0">
+              Arrange Withdrawal
             </Button>
           </div>
         )}
-        {ajo.payout && (
-          <p className="mt-4 text-sm text-navy-600">
-            Payout <span className="font-mono">{ajo.payout.reference}</span>: {formatCurrency(ajo.payout.payoutAmount)} after the{' '}
-            {formatCurrency(ajo.payout.serviceCharge)} service charge · <strong className="capitalize">{ajo.payout.status}</strong>
-            {ajo.payout.payoutReference && <> · transfer {ajo.payout.payoutReference}</>}
+        {ajo.withdrawals.map((w) => (
+          <p key={w.reference} className="mt-4 text-sm text-navy-600">
+            Withdrawal{' '}
+            <Link to={`/admin/withdrawals/${w.reference}`} className="font-mono font-semibold text-emerald-600 hover:text-emerald-700">{w.reference}</Link>
+            : {formatCurrency(w.payoutAmount)}
+            {w.serviceCharge > 0 && <> after the {formatCurrency(w.serviceCharge)} service charge</>} · <strong className="capitalize">{w.status}</strong>
+            {w.payoutReference && <> · transfer {w.payoutReference}</>}
           </p>
-        )}
+        ))}
       </Card>
 
       {ajo.contributions.length > 0 && (
@@ -295,19 +304,32 @@ export default function AjoAdminPanel({ transaction }) {
       <Modal
         open={payoutOpen}
         onClose={() => setPayoutOpen(false)}
-        title="Arrange Ajo Payout"
-        subtitle={`${transaction.customerName} · ${formatCurrency(ajo.netPayout)} to pay out`}
+        title="Arrange Ajo Withdrawal"
+        subtitle={`${transaction.customerName} · up to ${formatCurrency(ajo.available)} of their savings`}
         footer={(
           <>
             <Button variant="outline" onClick={() => setPayoutOpen(false)} disabled={busy}>Cancel</Button>
-            <Button variant="accent" onClick={submitPayout} loading={busy}>Arrange Payout</Button>
+            <Button variant="accent" onClick={submitPayout} loading={busy}>Arrange Withdrawal</Button>
           </>
         )}
       >
-        <p className="text-sm text-navy-600 mb-4">
-          The customer’s own account. The payout then appears under Withdrawals for final approval, and is marked paid once the transfer is sent.
-        </p>
-        <BankAccountForm value={payoutAccount} onChange={setPayoutAccount} errors={errors} />
+        <div className="flex flex-col gap-4">
+          <Input
+            label="Amount to Withdraw (₦)"
+            type="number"
+            min="0"
+            value={payoutAmount}
+            onChange={(e) => setPayoutAmount(e.target.value)}
+            error={errors.amount}
+            hint={ajo.chargeDue > 0
+              ? `The ${formatCurrency(ajo.chargeDue)} service charge comes off first, so the customer receives ${formatCurrency(Math.max(0, Number(payoutAmount) - ajo.chargeDue))}.`
+              : 'The service charge so far has already been taken.'}
+          />
+          <p className="text-sm text-navy-600">
+            Enter the customer’s own account. The withdrawal then appears under Withdrawals for final approval, and is marked paid once the transfer is sent.
+          </p>
+          <BankAccountForm value={payoutAccount} onChange={setPayoutAccount} errors={errors} />
+        </div>
       </Modal>
 
       <Modal

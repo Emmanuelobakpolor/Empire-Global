@@ -14,6 +14,7 @@ import LoadingState from '../../components/ui/LoadingState'
 import ReceiptPreview from '../../components/ReceiptPreview'
 import TransactionTimeline from '../../components/customer/TransactionTimeline'
 import ApplicationDetails from '../../components/admin/ApplicationDetails'
+import ContractAmendments from '../../components/admin/ContractAmendments'
 import { DetailList, bankAccountRows } from '../../components/customer/ApplicationForms'
 import { useDataStore } from '../../context/DataStoreContext'
 import { useAdminAuth } from '../../context/AdminAuthContext'
@@ -96,7 +97,7 @@ function RecommendationNote({ trail, what }) {
   )
 }
 
-function RepaymentRow({ repayment, isSuperAdmin, onAction }) {
+function RepaymentRow({ repayment, isSuperAdmin, canEditAmount, onAction }) {
   const [open, setOpen] = useState(repayment.state === 'pending')
   const state = REPAYMENT_STATE[repayment.state]
   const hasDetail = repayment.receipt || repayment.trail?.length || repayment.rejectionReason
@@ -134,6 +135,11 @@ function RepaymentRow({ repayment, isSuperAdmin, onAction }) {
             </p>
           )}
           {repayment.trail?.length > 0 && <Trail steps={repayment.trail} />}
+          {canEditAmount && (
+            <button type="button" onClick={() => onAction(repayment, 'amount')} className="self-start text-xs font-semibold text-emerald-600 hover:text-emerald-700">
+              Paid a different amount? Change it
+            </button>
+          )}
           {repayment.state === 'pending' && (
             <>
               <RecommendationNote trail={repayment.trail} what="repayment" />
@@ -160,9 +166,11 @@ export default function AdminFacilityDetails() {
   const { showToast } = useToast()
   const transaction = transactions.find((t) => t.id === id)
 
-  // { kind: 'application' | 'repayment' | 'rate', action: 'recommend' | 'approve' | 'reject' | 'change', decision?, repayment? }
+  // { kind: 'application' | 'repayment' | 'rate', action: 'recommend' | 'approve' | 'reject' | 'change' | 'amount', decision?, repayment? }
   const [dialog, setDialog] = useState(null)
   const [note, setNote] = useState('')
+  // What the customer actually paid on an instalment
+  const [amount, setAmount] = useState('')
   const [rate, setRate] = useState('')
   // Fees set on approval: legal %, inspection ₦ (depends on location), application ₦
   const [fees, setFees] = useState({ legalPercent: '', inspection: '', application: '' })
@@ -194,6 +202,7 @@ export default function AdminFacilityDetails() {
 
   const openDialog = (next) => {
     setNote('')
+    if (next.action === 'amount') setAmount(String(next.repayment.amount))
     if (next.kind === 'rate') setRate(String(facility.interestRate))
     else setRate(next.kind === 'application' && next.action === 'approve' && productRate != null ? String(productRate) : '')
     if (next.kind === 'application' && next.action === 'approve') {
@@ -239,12 +248,20 @@ export default function AdminFacilityDetails() {
       }
       return run(() => rejectPayment(transaction.id, note.trim()), 'Application rejected. The customer has been notified.')
     }
+    if (action === 'amount') {
+      if (!(Number(amount) > 0)) {
+        showToast('Enter the amount the customer paid.', 'error')
+        return
+      }
+      return run(() => repaymentAction(repayment.id, 'amount', { amount: Number(amount), note: note.trim() }), 'Amount updated. The instalments still to pay have been re-worked.')
+    }
     if (action === 'recommend') return run(() => repaymentAction(repayment.id, 'recommend', { decision, note: note.trim() }), 'Recommendation sent to a Super Admin.')
     return run(() => repaymentAction(repayment.id, action, { note: note.trim() }), action === 'approve' ? 'Repayment confirmed.' : 'Receipt rejected. The customer can pay again.')
   }
 
   const dialogTitle = !dialog ? '' : {
     change: 'Change Interest Rate',
+    amount: 'Change Amount Paid',
     recommend: dialog.decision === 'approve' ? 'Recommend Approval' : 'Recommend Rejection',
     approve: dialog.kind === 'application' ? 'Approve Application' : 'Confirm Repayment',
     reject: dialog.kind === 'application' ? 'Reject Application' : 'Reject Receipt',
@@ -289,6 +306,8 @@ export default function AdminFacilityDetails() {
           <div className="mt-5 bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3"><strong>Rejection Reason:</strong> {transaction.rejectionReason}</div>
         )}
       </Card>
+
+      <ContractAmendments transaction={transaction} />
 
       {facility.status === 'under_review' && (
         <Card className="mb-6">
@@ -365,6 +384,7 @@ export default function AdminFacilityDetails() {
                 key={r.id}
                 repayment={r}
                 isSuperAdmin={isSuperAdmin}
+                canEditAmount={isSuperAdmin && facility.status === 'active' && (r.state === 'pending' || r.state === 'paid')}
                 onAction={(repayment, action, decision) => openDialog({ kind: 'repayment', action, decision, repayment })}
               />
             ))}
@@ -392,6 +412,7 @@ export default function AdminFacilityDetails() {
         subtitle={
           dialog?.action === 'recommend' ? 'Your recommendation is sent to a Super Admin for the final decision.'
             : dialog?.action === 'reject' ? 'The customer will see this reason.'
+            : dialog?.action === 'amount' ? `What the customer actually paid on instalment ${dialog.repayment.number}. The rest of what’s owed is spread over the instalments still to pay, and the customer is notified.`
             : dialog?.kind === 'repayment' ? `Confirms ${formatCurrency(dialog.repayment.amount)} for instalment ${dialog.repayment.number}. This is final.`
             : dialog?.kind === 'rate' ? (facility.status === 'active'
               ? 'Confirmed repayments stay as they are; the rest of the new total is spread evenly over the unpaid instalments. The customer is notified.'
@@ -412,6 +433,18 @@ export default function AdminFacilityDetails() {
         }
       >
         <div className="flex flex-col gap-4">
+          {dialog?.action === 'amount' && (
+            <Input
+              label="Amount Paid (₦)"
+              type="number"
+              min="0"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              hint={`Scheduled as ${formatCurrency(dialog.repayment.amount)}. ${formatCurrency(facility.outstanding)} is outstanding on the facility.`}
+              required
+            />
+          )}
           {asksRate && (
             <>
               <Input

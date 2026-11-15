@@ -1,6 +1,6 @@
-// Ajo (Esusu): a fixed contribution every day or week for a cycle, paid back at the end less one
-// contribution. The server builds the schedule and does the sums; these helpers label things and
-// estimate a plan before it starts.
+// Ajo (Esusu): a fixed contribution every day or week for a cycle of calendar months, withdrawn
+// when the customer asks, less one contribution for each month saved in. The server builds the
+// schedule and does the sums; these helpers label things and estimate a plan before it starts.
 import { instalmentCount } from './facility'
 
 export const CONTRIBUTION_FREQUENCY = {
@@ -30,12 +30,16 @@ export const CONTRIBUTION_STATE = {
 
 export const METHOD_LABELS = { transfer: 'Bank transfer', cash: 'Cash' }
 
-// Before the plan starts: how many contributions, the total, the charge (one contribution) and the payout
+// Cycles run on calendar months: a plan joined today starts on the 1st of this month
+export const cycleStart = (today = new Date().toISOString().slice(0, 10)) => `${today.slice(0, 7)}-01`
+
+// Before the plan starts: how many contributions, the total, the charge (one contribution a month) and the payout
 export function estimateAjo(amount, frequency, termMonths) {
   if (!amount || !frequency || !termMonths) return null
-  const count = instalmentCount(termMonths, frequency)
+  const count = instalmentCount(termMonths, frequency, cycleStart())
   const total = amount * count
-  return { count, total, charge: amount, payout: total - amount }
+  const charge = amount * termMonths
+  return { count, total, charge, payout: total - charge }
 }
 
 export const contributionsToConfirm = (txn) => txn.ajo?.contributions.filter((c) => c.state === 'pending').length || 0

@@ -85,10 +85,10 @@ function AjoEstimate({ estimate, frequency }) {
         <strong className="text-navy-900">{formatCurrency(estimate.total)}</strong> saved if you pay them all.
       </p>
       <p className="mt-1">
-        At the end you collect <strong className="text-navy-900">{formatCurrency(estimate.payout)}</strong>, after the service charge of one contribution ({formatCurrency(estimate.charge)}).
+        You collect <strong className="text-navy-900">{formatCurrency(estimate.payout)}</strong>, after the service charge of one contribution a month ({formatCurrency(estimate.charge)}).
       </p>
       <p className="text-xs text-navy-400 mt-1">
-        Your cycle starts today. Pay each contribution in cash to our staff or by transfer; our staff record it and your Ajo balance updates. Your payout is arranged when the cycle ends, and missed contributions aren’t carried over.
+        Your cycle runs on calendar months, from the 1st of this month. Pay each contribution in cash to our staff or by transfer; our staff record it and your Ajo balance updates. You can request a withdrawal at any time, and missed contributions aren’t carried over.
       </p>
     </div>
   )
@@ -551,8 +551,8 @@ export default function CreateTransaction() {
                   ...(ajoEstimate ? [
                     { label: 'Contributions in the Cycle', value: String(ajoEstimate.count) },
                     { label: 'Saved If All Are Paid', value: formatCurrency(ajoEstimate.total) },
-                    { label: 'Service Charge', value: `${formatCurrency(ajoEstimate.charge)} (one contribution)` },
-                    { label: 'You Collect at the End', value: formatCurrency(ajoEstimate.payout) },
+                    { label: 'Service Charge', value: `${formatCurrency(ajoEstimate.charge)} (one contribution a month)` },
+                    { label: 'You Collect', value: formatCurrency(ajoEstimate.payout) },
                   ] : []),
                 ] : [{ label: 'Amount', value: formatCurrency(Number(amount)) }]),
                 ...(isInvestment || isAjo ? [] : [{ label: 'Payment Frequency', value: planFrequency }]),

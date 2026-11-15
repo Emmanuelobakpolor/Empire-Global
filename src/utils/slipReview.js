@@ -4,6 +4,7 @@ export const TRAIL_LABELS = {
   recommended_rejection: 'Recommended rejection',
   approved: 'Final approval',
   rejected: 'Final rejection',
+  amount_changed: 'Amount paid changed',
 }
 
 export function latestRecommendation(txn) {

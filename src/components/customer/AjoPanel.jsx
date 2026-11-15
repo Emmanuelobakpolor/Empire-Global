@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { CalendarClock, Clock, Info, PartyPopper, Printer, Wallet } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ArrowDownToLine, CalendarClock, Clock, Info, PartyPopper, Printer, Wallet } from 'lucide-react'
 import Card from '../ui/Card'
 import Badge from '../ui/Badge'
 import Button from '../ui/Button'
@@ -21,18 +22,18 @@ function Stat({ label, value, tone = 'text-navy-900' }) {
   )
 }
 
-// Saved so far, the charge and what's paid out at the end
+// What's on the plan now, the charge so far (one contribution for each month saved in) and what can be withdrawn
 export function AjoSummary({ transaction }) {
   const ajo = transaction.ajo
   const progress = ajo.count ? Math.round((ajo.paidCount / ajo.count) * 100) : 0
   return (
     <div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <Stat label="Ajo Balance" value={formatCurrency(ajo.payout ? 0 : ajo.saved)} tone="text-emerald-600" />
+        <Stat label="Ajo Balance" value={formatCurrency(ajo.balance)} tone="text-emerald-600" />
         <Stat label="Contribution" value={`${formatCurrency(ajo.contribution)} ${contributionLabel(ajo.frequency).toLowerCase()}`} />
         <Stat label="Contributions Paid" value={`${ajo.paidCount} of ${ajo.count}`} />
-        <Stat label="Service Charge" value={formatCurrency(ajo.payout?.serviceCharge ?? ajo.serviceCharge)} />
-        <Stat label={ajo.payout ? 'Payout' : 'Payout So Far'} value={formatCurrency(ajo.payout?.payoutAmount ?? ajo.netPayout)} />
+        <Stat label="Service Charge So Far" value={formatCurrency(ajo.serviceCharge)} />
+        <Stat label="Available to Withdraw" value={formatCurrency(ajo.netPayout)} />
         <Stat label="Cycle Ends" value={formatDate(ajo.cycleEnds)} />
       </div>
       <div className="mt-4">
@@ -105,8 +106,8 @@ function ScheduleRow({ contribution }) {
   )
 }
 
-// An Ajo plan as the customer sees it. View only: our staff record every contribution and arrange
-// the payout, and the balance here updates as they do.
+// An Ajo plan as the customer sees it. Our staff record every contribution and the balance here
+// updates as they do; the customer can ask to withdraw what's saved at any time.
 export default function AjoPanel({ transaction }) {
   const [showAll, setShowAll] = useState(false)
   const ajo = transaction.ajo
@@ -115,6 +116,7 @@ export default function AjoPanel({ transaction }) {
   const overdue = contributions.filter((c) => c.state === 'overdue').length
   const waiting = contributions.filter((c) => c.state === 'pending').length
   const next = ajo.nextContribution
+  const inProgress = ajo.withdrawals.filter((w) => w.status !== 'paid')
 
   return (
     <>
@@ -132,18 +134,27 @@ export default function AjoPanel({ transaction }) {
             </span>
           </p>
         )}
-        {state === 'ended' && (
-          <p className="mt-5 flex items-start gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            <Wallet size={16} className="mt-0.5 shrink-0" />
-            Your cycle has ended. Our staff will arrange your payout of {formatCurrency(ajo.netPayout)} ({formatCurrency(ajo.saved)} saved, less the {formatCurrency(ajo.serviceCharge)} service charge).
-          </p>
+        {ajo.netPayout > 0 && (
+          <div className="mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            <p className="flex items-start gap-2">
+              <Wallet size={16} className="mt-0.5 shrink-0" />
+              <span>
+                {state === 'ended' && 'Your cycle has ended. '}
+                You can withdraw up to {formatCurrency(ajo.netPayout)}
+                {ajo.chargeDue > 0 && ` (${formatCurrency(ajo.available)} saved, less the ${formatCurrency(ajo.chargeDue)} service charge)`}.
+              </span>
+            </p>
+            <Link to="/customer/withdrawals" className="shrink-0">
+              <Button size="sm" variant="accent" icon={ArrowDownToLine}>Request Withdrawal</Button>
+            </Link>
+          </div>
         )}
-        {state === 'payout_requested' && (
-          <p className="mt-5 flex items-start gap-2 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        {inProgress.map((w) => (
+          <p key={w.reference} className="mt-5 flex items-start gap-2 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800">
             <Clock size={16} className="mt-0.5 shrink-0" />
-            Your payout of {formatCurrency(ajo.payout.payoutAmount)} ({ajo.payout.reference}) is being processed.
+            Your withdrawal of {formatCurrency(w.payoutAmount)} ({w.reference}) is {w.status === 'approved' ? 'approved and will be sent to your bank account' : 'being reviewed'}.
           </p>
-        )}
+        ))}
         {state === 'paid_out' && (
           <p className="mt-5 flex items-start gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
             <PartyPopper size={16} className="mt-0.5 shrink-0" />

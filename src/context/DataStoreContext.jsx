@@ -205,6 +205,21 @@ export function DataStoreProvider({ children }) {
     return result
   }
 
+  // ---- Corrections to a running contract (Super Admins) ----
+  // The day the contract really started: its end date and schedule move with it on the server
+  const changeContractDate = async (transactionId, startDate, note) => {
+    if (!isSuperAdmin()) return { success: false, error: 'Only a Super Admin can change a contract date.' }
+    return reviewAction(transactionId, 'contract-date', { startDate, note: note || '' })
+  }
+
+  // What was actually paid on a savings plan or investment: the balance and interest follow it
+  const changePaymentAmount = async (transactionId, amount, note) => {
+    if (!isSuperAdmin()) return { success: false, error: 'Only a Super Admin can change the amount paid.' }
+    const result = await reviewAction(transactionId, 'amount', { amount: Number(amount), note: note || '' })
+    if (result.success) refreshCustomers()
+    return result
+  }
+
   // ---- Investment interest ----
   // Admins send each payment by bank transfer as it comes due, then record the transfer reference
   const getInterestPayments = () => call('/admin/interest-payments/')
@@ -225,18 +240,19 @@ export function DataStoreProvider({ children }) {
   }
 
   // action: 'recommend' (any admin, body { decision, note }) | 'approve' | 'reject' (Super Admin, body { note })
+  // | 'amount' (Super Admin, body { amount, note }: what was actually paid on the instalment)
   const repaymentAction = async (repaymentId, action, body = {}) => {
     const result = await call(`/admin/repayments/${repaymentId}/${action}/`, { method: 'POST', body }, { audited: true })
     if (result.success) {
       replaceTransaction(result.transaction)
-      if (action === 'approve') refreshCustomers()
+      if (action === 'approve' || action === 'amount') refreshCustomers()
     }
     return result
   }
 
   // ---- Ajo contributions ----
-  // Customers only watch their Ajo: staff record every contribution (cash or transfer) and a Super
-  // Admin's confirmation credits the customer's Ajo balance on the server.
+  // Staff record every contribution (cash or transfer) and a Super Admin's confirmation credits the
+  // customer's Ajo balance on the server. Customers withdraw from it like any other plan.
 
   // action: 'record' (any admin, body { method, receivedOn, reference, note }) | 'recommend' (body { decision, note })
   // | 'approve' | 'reject' (Super Admin, body { note })
@@ -249,8 +265,8 @@ export function DataStoreProvider({ children }) {
     return result
   }
 
-  // Once the cycle ends, an admin starts the payout: a withdrawal of what was saved less the charge,
-  // which then goes through the usual approval. body: { bankName, accountNumber, accountName, note }
+  // An admin starts a withdrawal for the customer (e.g. one without the app): it then goes through
+  // the usual approval. body: { amount (everything available when left out), bankName, accountNumber, accountName, note }
   const arrangeAjoPayout = async (transactionId, body) => {
     const result = await reviewAction(transactionId, 'payout', body)
     if (result.success) refreshWithdrawals('admin')
@@ -570,6 +586,8 @@ export function DataStoreProvider({ children }) {
     rejectPayment,
     disburseFacility,
     changeInterestRate,
+    changeContractDate,
+    changePaymentAmount,
     getInterestPayments,
     recordInterestPayment,
     uploadRepaymentReceipt,

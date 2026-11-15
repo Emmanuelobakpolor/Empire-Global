@@ -7,8 +7,9 @@ import Modal from '../ui/Modal'
 import { useDataStore } from '../../context/DataStoreContext'
 import { useToast } from '../../context/ToastContext'
 import { formatCurrency } from '../../utils/formatCurrency'
+import { formatDate } from '../../utils/formatDate'
 import { formatTerm } from '../../utils/planPeriod'
-import { CONTRIBUTION_FREQUENCY, contributionLabel, estimateAjo } from '../../utils/ajo'
+import { CONTRIBUTION_FREQUENCY, contributionLabel, cycleStart, estimateAjo } from '../../utils/ajo'
 
 export const EMPTY_AJO_PLAN = { productId: '', amount: '', contributionFrequency: '', termMonths: '', termsAccepted: false }
 
@@ -79,8 +80,8 @@ export function AjoPlanFields({ value, onChange, errors = {} }) {
           {estimate && (
             <p className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 text-sm text-navy-700">
               {estimate.count} contributions of {formatCurrency(Number(value.amount))} {CONTRIBUTION_FREQUENCY[value.contributionFrequency]?.per}:{' '}
-              <strong>{formatCurrency(estimate.total)}</strong> if all are paid, so <strong>{formatCurrency(estimate.payout)}</strong> at the end after the{' '}
-              {formatCurrency(estimate.charge)} service charge. The cycle starts today.
+              <strong>{formatCurrency(estimate.total)}</strong> if all are paid, so <strong>{formatCurrency(estimate.payout)}</strong> after the{' '}
+              {formatCurrency(estimate.charge)} service charge (one contribution a month). The cycle runs from {formatDate(cycleStart())}.
             </p>
           )}
           {product.clauses?.length > 0 && (

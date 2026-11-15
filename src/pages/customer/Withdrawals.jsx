@@ -116,7 +116,7 @@ export default function Withdrawals() {
 
   return (
     <div className="max-w-4xl">
-      <PageHeader title="Withdrawals" subtitle="Take money out of your savings and investment plans." />
+      <PageHeader title="Withdrawals" subtitle="Take money out of your savings, investment and Ajo plans." />
 
       <Card className="mb-6">
         <h3 className="text-sm font-bold text-navy-800 mb-1">New withdrawal</h3>
@@ -125,7 +125,7 @@ export default function Withdrawals() {
         {plans === null ? (
           <LoadingState label="Loading your plans..." />
         ) : plans.length === 0 ? (
-          <EmptyState icon={Wallet} title="Nothing to withdraw yet" description="Once a savings or investment payment is approved, the plan appears here." />
+          <EmptyState icon={Wallet} title="Nothing to withdraw yet" description="Once a savings or investment payment is approved, or you join Ajo, the plan appears here." />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {plans.map((p) => {
@@ -270,7 +270,7 @@ function QuotePanel({ quote, quoting, notes }) {
         { label: quote.kind === 'full' ? 'Withdrawing (whole plan)' : 'Withdrawing', value: formatCurrency(quote.payoutAmount + quote.penalty + (quote.interestDeducted || 0) + (quote.serviceCharge || 0)) },
         ...(quote.penalty > 0 ? [{ label: `Early termination penalty (${quote.penaltyPercent}%)`, value: `− ${formatCurrency(quote.penalty)}`, tone: 'text-red-500' }] : []),
         ...(quote.interestDeducted > 0 ? [{ label: 'Interest already paid, no longer earned', value: `− ${formatCurrency(quote.interestDeducted)}`, tone: 'text-red-500' }] : []),
-        ...(quote.serviceCharge > 0 ? [{ label: 'Service charge (one contribution)', value: `− ${formatCurrency(quote.serviceCharge)}`, tone: 'text-red-500' }] : []),
+        ...(quote.serviceCharge > 0 ? [{ label: 'Ajo service charge', value: `− ${formatCurrency(quote.serviceCharge)}`, tone: 'text-red-500' }] : []),
         { label: 'You receive', value: formatCurrency(quote.payoutAmount), bold: true },
         { label: 'Earliest payout', value: formatDate(quote.earliestPayoutDate) },
       ].map((row) => (

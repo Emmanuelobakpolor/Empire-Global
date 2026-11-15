@@ -39,7 +39,7 @@ export function downloadCsv(transactions, agentFor) {
 const escapeHtml = (value) =>
   String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch])
 
-// An Ajo plan's statement: every contribution, the service charge and the payout, with the running
+// An Ajo plan's statement: every contribution, service charge and withdrawal, with the running
 // balance. Opens printable; the browser's print dialog can save it as a PDF.
 export function printStatement({ transaction, formatAmount, formatDate }) {
   const win = window.open('', '_blank')
@@ -59,8 +59,9 @@ export function printStatement({ transaction, formatAmount, formatDate }) {
   ]
   const summary = [
     ['Total contributed', formatAmount(credits)],
-    ['Service charge', formatAmount(ajo.payout?.serviceCharge ?? ajo.serviceCharge)],
-    [ajo.payout ? 'Net payout' : 'Payout due at the end', formatAmount(ajo.payout?.payoutAmount ?? ajo.netPayout)],
+    ['Service charge so far', formatAmount(ajo.serviceCharge)],
+    ['Balance', formatAmount(ajo.balance)],
+    ['Available to withdraw', formatAmount(ajo.netPayout)],
   ]
   win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Statement ${escapeHtml(transaction.reference)}</title>
 <style>

@@ -6,7 +6,7 @@ export default function Ajo() {
     <ProductCategoryPage
       type="ajo"
       title="Ajo"
-      subtitle="Esusu: contribute a fixed amount every day or week and collect it all at the end of your cycle."
+      subtitle="Esusu: contribute a fixed amount every day or week, and withdraw what you’ve saved when you need it."
       icon={HandCoins}
       balanceKey="ajoBalance"
     />
