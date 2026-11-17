@@ -14,6 +14,7 @@ import EmptyState from '../../components/ui/EmptyState'
 import LoadingState from '../../components/ui/LoadingState'
 import ReceiptPreview from '../../components/ReceiptPreview'
 import { AgentCell } from '../../components/admin/AgentFilter'
+import AjoAdminPanel from '../../components/admin/AjoAdminPanel'
 import ApplicationDetails from '../../components/admin/ApplicationDetails'
 import ContractAmendments from '../../components/admin/ContractAmendments'
 import PlanPeriodCard from '../../components/PlanPeriod'
@@ -169,6 +170,8 @@ export default function PaymentDetails() {
       </Card>
 
       <PlanPeriodCard transaction={transaction} />
+
+      {transaction.ajo ? <AjoAdminPanel transaction={transaction} /> : null}
 
       <ContractAmendments transaction={transaction} />
 
