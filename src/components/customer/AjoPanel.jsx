@@ -24,7 +24,7 @@ function Stat({ label, value, tone = 'text-navy-900' }) {
 
 // What's on the plan now, the charge so far (one contribution for each month saved in) and what can be withdrawn
 export function AjoSummary({ transaction }) {
-  const ajo = transaction.ajo
+  const ajo = transaction?.ajo || { balance: 0, contribution: 0, paidCount: 0, count: 0, serviceCharge: 0, netPayout: 0, cycleEnds: null, frequency: null, saved: 0, target: 0 }
   const progress = ajo.count ? Math.round((ajo.paidCount / ajo.count) * 100) : 0
   return (
     <div>
@@ -49,7 +49,7 @@ export function AjoSummary({ transaction }) {
 }
 
 export function StatementCard({ transaction }) {
-  const { statement } = transaction.ajo
+  const statement = transaction?.ajo?.statement || []
   const print = () => printStatement({ transaction, formatAmount: formatCurrency, formatDate })
   return (
     <Card className="mb-6" padded={false}>
@@ -109,14 +109,14 @@ function ScheduleRow({ contribution }) {
 // An Ajo plan as the customer sees it. Our staff record every contribution and the balance here
 // updates as they do; the customer can ask to withdraw what's saved at any time.
 export default function AjoPanel({ transaction }) {
+  const ajo = transaction?.ajo || { contributions: [], withdrawals: [], state: 'active', nextContribution: null, netPayout: 0, chargeDue: 0, available: 0, paymentAccount: null }
   const [showAll, setShowAll] = useState(false)
-  const ajo = transaction.ajo
-  const { contributions, state } = ajo
+  const { contributions = [], state } = ajo
   const shown = showAll ? contributions : contributions.filter((c) => c.state !== 'paid').slice(0, PREVIEW_ROWS)
   const overdue = contributions.filter((c) => c.state === 'overdue').length
   const waiting = contributions.filter((c) => c.state === 'pending').length
   const next = ajo.nextContribution
-  const inProgress = ajo.withdrawals.filter((w) => w.status !== 'paid')
+  const inProgress = (ajo.withdrawals || []).filter((w) => w.status !== 'paid')
 
   return (
     <>

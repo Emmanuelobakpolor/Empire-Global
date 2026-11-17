@@ -127,6 +127,7 @@ const today = () => new Date().toISOString().slice(0, 10)
 
 // An Ajo plan as admins run it: record cash and transfers, confirm them, arrange withdrawals and see the statement
 export default function AjoAdminPanel({ transaction }) {
+  const safeAjo = transaction?.ajo || { state: 'active', contributions: [], withdrawals: [], paidCount: 0, count: 0, netPayout: 0, available: 0, chargeDue: 0 }
   const { contributionAction, arrangeAjoPayout } = useDataStore()
   const { isSuperAdmin } = useAdminAuth()
   const { showToast } = useToast()
@@ -142,11 +143,11 @@ export default function AjoAdminPanel({ transaction }) {
   const [payoutAccount, setPayoutAccount] = useState(EMPTY_BANK_ACCOUNT)
   const [payoutAmount, setPayoutAmount] = useState('')
 
-  const ajo = transaction.ajo
-  const state = AJO_STATE[ajo.state]
+  const ajo = safeAjo
+  const state = AJO_STATE[ajo.state] || AJO_STATE.active
   const canRecord = ajo.state === 'active'
-  const toReview = ajo.contributions.filter((c) => c.state === 'pending')
-  const rest = ajo.contributions.filter((c) => c.state !== 'pending')
+  const toReview = (ajo.contributions || []).filter((c) => c.state === 'pending')
+  const rest = (ajo.contributions || []).filter((c) => c.state !== 'pending')
   const shown = showAll ? rest : rest.filter((c) => c.state !== 'paid').slice(0, PREVIEW_ROWS)
 
   const openAction = (contribution, action, decision) => {
@@ -192,7 +193,7 @@ export default function AjoAdminPanel({ transaction }) {
 
   const openPayout = () => {
     setPayoutAccount({ ...EMPTY_BANK_ACCOUNT, accountName: transaction.customerName })
-    setPayoutAmount(String(ajo.available))
+    setPayoutAmount(String(ajo.available || 0))
     setErrors({})
     setPayoutOpen(true)
   }
@@ -242,7 +243,7 @@ export default function AjoAdminPanel({ transaction }) {
             </Button>
           </div>
         )}
-        {ajo.withdrawals.map((w) => (
+        {(ajo.withdrawals || []).map((w) => (
           <p key={w.reference} className="mt-4 text-sm text-navy-600">
             Withdrawal{' '}
             <Link to={`/admin/withdrawals/${w.reference}`} className="font-mono font-semibold text-emerald-600 hover:text-emerald-700">{w.reference}</Link>
@@ -253,7 +254,7 @@ export default function AjoAdminPanel({ transaction }) {
         ))}
       </Card>
 
-      {ajo.contributions.length > 0 && (
+      {(ajo.contributions || []).length > 0 && (
         <Card className="mb-6" padded={false}>
           <div className="flex items-center justify-between gap-3 px-5 sm:px-6 pt-5 pb-3">
             <h3 className="text-sm font-bold text-navy-800">Contributions</h3>
@@ -271,7 +272,7 @@ export default function AjoAdminPanel({ transaction }) {
             onClick={() => setShowAll((s) => !s)}
             className="w-full border-t border-navy-50 px-4 py-3 text-xs font-semibold text-emerald-600 hover:text-emerald-700"
           >
-            {showAll ? 'Show less' : `Show all ${ajo.contributions.length} contributions`}
+            {showAll ? 'Show less' : `Show all ${(ajo.contributions || []).length} contributions`}
           </button>
         </Card>
       )}
