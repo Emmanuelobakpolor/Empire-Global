@@ -9,7 +9,10 @@ export const CONTRIBUTION_FREQUENCY = {
   monthly: { label: 'Monthly', per: 'a month', unit: 'month' },
 }
 
-export const contributionLabel = (frequency) => CONTRIBUTION_FREQUENCY[frequency]?.label || frequency
+export const contributionLabel = (frequency) => {
+  const label = CONTRIBUTION_FREQUENCY[frequency]?.label || (typeof frequency === 'string' ? frequency : '')
+  return label || '—'
+}
 
 // `badge` is a Badge status key, so the colour matches the rest of the UI
 export const AJO_STATE = {

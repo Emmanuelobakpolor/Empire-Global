@@ -25,13 +25,14 @@ function Stat({ label, value, tone = 'text-navy-900' }) {
 // What's on the plan now, the charge so far (one contribution for each month saved in) and what can be withdrawn
 export function AjoSummary({ transaction }) {
   const ajo = transaction?.ajo || { balance: 0, contribution: 0, paidCount: 0, count: 0, serviceCharge: 0, netPayout: 0, cycleEnds: null, frequency: null, saved: 0, target: 0 }
-  const progress = ajo.count ? Math.round((ajo.paidCount / ajo.count) * 100) : 0
+  const progress = Number(ajo.count) ? Math.round((Number(ajo.paidCount || 0) / Number(ajo.count)) * 100) : 0
+  const contribution = contributionLabel(ajo.frequency)
   return (
     <div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <Stat label="Ajo Balance" value={formatCurrency(ajo.balance)} tone="text-emerald-600" />
-        <Stat label="Contribution" value={`${formatCurrency(ajo.contribution)} ${contributionLabel(ajo.frequency).toLowerCase()}`} />
-        <Stat label="Contributions Paid" value={`${ajo.paidCount} of ${ajo.count}`} />
+        <Stat label="Contribution" value={`${formatCurrency(ajo.contribution)} ${contribution && contribution !== '—' ? contribution.toLowerCase() : ''}`.trim()} />
+        <Stat label="Contributions Paid" value={`${ajo.paidCount || 0} of ${ajo.count || 0}`} />
         <Stat label="Service Charge So Far" value={formatCurrency(ajo.serviceCharge)} />
         <Stat label="Available to Withdraw" value={formatCurrency(ajo.netPayout)} />
         <Stat label="Cycle Ends" value={formatDate(ajo.cycleEnds)} />

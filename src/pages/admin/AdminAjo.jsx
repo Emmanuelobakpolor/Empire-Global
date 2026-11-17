@@ -42,6 +42,11 @@ export default function AdminAjo() {
 
   const plans = transactions.filter((t) => t.ajo && agentFilter.matchesCustomer(t.customerId))
 
+  const safeContributionLabel = (frequency) => {
+    const label = contributionLabel(frequency)
+    return label === '—' ? '' : label.toLowerCase()
+  }
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
     return plans.filter((t) =>
@@ -88,7 +93,7 @@ export default function AdminAjo() {
                 <Td className="font-semibold">{t.reference}</Td>
                 <Td>{t.customerName}</Td>
                 <Td><AgentCell code={agentFilter.agentCodeForCustomer(t.customerId)} /></Td>
-                <Td className="whitespace-nowrap">{formatCurrency(t.ajo.contribution)} {contributionLabel(t.ajo.frequency).toLowerCase()}</Td>
+                <Td className="whitespace-nowrap">{formatCurrency(t.ajo.contribution)} {safeContributionLabel(t.ajo.frequency)}</Td>
                 <Td className="whitespace-nowrap">
                   <span className="font-semibold">{formatCurrency(t.ajo.saved)}</span>
                   <span className="block text-xs text-navy-400">{t.ajo.paidCount}/{t.ajo.count} paid</span>
