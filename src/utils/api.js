@@ -85,11 +85,12 @@ export async function api(path, { method = 'GET', body } = {}, retried = false) 
   throw new ApiError(messageFrom(data, res.status), { status: res.status, code: data?.code, data })
 }
 
-// Turns an ApiError into the { success: false, ... } shape the pages already use
+// Turns an ApiError into the { success: false, ... } shape the pages expect
 export function failure(err) {
   return {
     success: false,
     error: err.message || SERVER_ERROR,
+    status: err.status,
     code: err.code,
     fieldErrors: fieldErrors(err.data),
     data: err.data,

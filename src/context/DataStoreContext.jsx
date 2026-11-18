@@ -158,6 +158,13 @@ export function DataStoreProvider({ children }) {
     if (!txn) return { success: false, error: 'Payment not found.' }
     const result = await call(`/admin/transactions/${txn.reference}/${action}/`, { method: 'POST', body }, { audited: true })
     if (result.success) replaceTransaction(result.transaction)
+    if (!result.success && result.status === 404) {
+      await refreshTransactions('admin')
+      return {
+        ...result,
+        error: 'This transaction no longer exists on the server. Refresh the page or restore the transaction record.',
+      }
+    }
     return result
   }
 
@@ -215,6 +222,10 @@ export function DataStoreProvider({ children }) {
   // What was actually paid on a savings plan or investment: the balance and interest follow it
   const changePaymentAmount = async (transactionId, amount, note) => {
     if (!isSuperAdmin()) return { success: false, error: 'Only a Super Admin can change the amount paid.' }
+    const txn = findTxn(transactionId)
+    if (txn?.ajo) {
+      return { success: false, error: 'An Ajo plan is paid in by contributions, recorded one at a time.', code: 'not_a_deposit' }
+    }
     const result = await reviewAction(transactionId, 'amount', { amount: Number(amount), note: note || '' })
     if (result.success) refreshCustomers()
     return result

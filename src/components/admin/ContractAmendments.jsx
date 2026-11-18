@@ -45,6 +45,10 @@ export default function ContractAmendments({ transaction }) {
   if (!isSuperAdmin || (!started && !canChangeAmount)) return null
 
   const open = (what) => {
+    if (what === 'amount' && ajo) {
+      showToast('An Ajo plan is paid in by contributions, recorded one at a time.', 'error')
+      return
+    }
     setValue(what === 'date' ? transaction.startDate : String(transaction.amount))
     setNote('')
     setError('')
